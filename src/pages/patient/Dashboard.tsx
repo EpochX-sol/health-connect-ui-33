@@ -4,31 +4,49 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
-import { Appointment } from '@/types';
-import { Calendar, Video, MessageSquare, Clock, Plus } from 'lucide-react';
-import { format } from 'date-fns';
+import { Appointment, Prescription } from '@/types';
+import { 
+  Calendar, 
+  Video, 
+  MessageSquare, 
+  Clock, 
+  Plus, 
+  Activity, 
+  FileText, 
+  TrendingUp,
+  Stethoscope,
+  Pill,
+  Heart
+} from 'lucide-react';
+import { format, isToday, isTomorrow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 const PatientDashboard = () => {
   const { user, token } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     if (token) {
-      fetchAppointments();
+      fetchData();
     }
   }, [token]);
 
-  const fetchAppointments = async () => {
+  const fetchData = async () => {
     try {
-      const data = await api.getAppointments(token!);
-      setAppointments(data.filter((apt: Appointment) => apt.status === 'booked'));
+      const [appointmentsData, prescriptionsData] = await Promise.all([
+        api.getAppointments(token!),
+        api.getPrescriptions(token!)
+      ]);
+      setAppointments(appointmentsData);
+      setPrescriptions(prescriptionsData);
     } catch (error) {
       toast({
-        title: 'Failed to load appointments',
+        title: 'Failed to load data',
         variant: 'destructive',
       });
     } finally {
@@ -37,128 +55,187 @@ const PatientDashboard = () => {
   };
 
   const upcomingAppointments = appointments
-    .filter((apt) => new Date(apt.scheduled_time) > new Date())
-    .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime())
-    .slice(0, 3);
+    .filter((apt) => apt.status === 'booked' && new Date(apt.scheduled_time) > new Date())
+    .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime());
+
+  const recentAppointments = upcomingAppointments.slice(0, 3);
+  const completedCount = appointments.filter((apt) => apt.status === 'completed').length;
+  const nextAppointment = upcomingAppointments[0];
+
+  const getAppointmentTimeLabel = (date: Date) => {
+    if (isToday(date)) return 'Today';
+    if (isTomorrow(date)) return 'Tomorrow';
+    return format(date, 'MMM dd');
+  };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back, {user?.name}!</h1>
-        <p className="text-muted-foreground">Manage your appointments and health records</p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Welcome Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-primary p-8 text-primary-foreground shadow-lg">
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-2">Welcome back, {user?.name}!</h1>
+          <p className="text-primary-foreground/90 text-lg">Your health journey at a glance</p>
+        </div>
+        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl"></div>
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/10 blur-3xl"></div>
       </div>
 
+      {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-primary text-primary-foreground border-0 shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-primary-foreground/80">Upcoming</CardDescription>
-            <CardTitle className="text-3xl">{upcomingAppointments.length}</CardTitle>
+        <Card className="border-primary/20 bg-card hover:shadow-lg transition-all hover:-translate-y-1">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription>Upcoming</CardDescription>
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-primary" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-primary-foreground/80">Appointments scheduled</p>
+            <div className="text-3xl font-bold text-foreground">{upcomingAppointments.length}</div>
+            <p className="text-sm text-muted-foreground mt-1">Appointments scheduled</p>
           </CardContent>
         </Card>
 
-        <Link to="/patient/appointments/book" className="block">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardHeader className="pb-2">
-              <CardDescription>Quick Action</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                Book Now
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Schedule a new appointment</p>
-            </CardContent>
-          </Card>
-        </Link>
+        <Card className="border-secondary/20 bg-card hover:shadow-lg transition-all hover:-translate-y-1">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription>Completed</CardDescription>
+              <div className="h-10 w-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                <Activity className="h-5 w-5 text-secondary" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-foreground">{completedCount}</div>
+            <p className="text-sm text-muted-foreground mt-1">Total consultations</p>
+          </CardContent>
+        </Card>
 
-        <Link to="/patient/messages" className="block">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardHeader className="pb-2">
-              <CardDescription>Communication</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                Messages
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Chat with your doctors</p>
-            </CardContent>
-          </Card>
-        </Link>
+        <Card className="border-accent/20 bg-card hover:shadow-lg transition-all hover:-translate-y-1">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription>Prescriptions</CardDescription>
+              <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center">
+                <Pill className="h-5 w-5 text-accent" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-foreground">{prescriptions.length}</div>
+            <p className="text-sm text-muted-foreground mt-1">Active prescriptions</p>
+          </CardContent>
+        </Card>
 
-        <Link to="/patient/prescriptions" className="block">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardHeader className="pb-2">
-              <CardDescription>Medical Records</CardDescription>
-              <CardTitle className="text-2xl">Rx</CardTitle>
+        <Link to="/patient/appointments/book" className="block group">
+          <Card className="h-full border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1 cursor-pointer">
+            <CardHeader className="pb-3">
+              <CardDescription className="group-hover:text-primary transition-colors">Quick Action</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">View prescriptions</p>
+            <CardContent className="flex flex-col items-center justify-center py-4">
+              <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary group-hover:scale-110 transition-all">
+                <Plus className="h-6 w-6 text-primary group-hover:text-primary-foreground" />
+              </div>
+              <p className="font-semibold text-foreground">Book Appointment</p>
             </CardContent>
           </Card>
         </Link>
       </div>
+
+      {nextAppointment && (
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <CardTitle>Next Appointment</CardTitle>
+              <Badge className="ml-auto">{getAppointmentTimeLabel(new Date(nextAppointment.scheduled_time))}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-gradient-secondary flex items-center justify-center shadow-md">
+                  <Stethoscope className="h-8 w-8 text-secondary-foreground" />
+                </div>
+                <div>
+                  <p className="font-semibold text-lg text-foreground">Dr. {nextAppointment.doctor?.name || 'Doctor'}</p>
+                  <p className="text-sm text-muted-foreground">{nextAppointment.doctorProfile?.specialty || 'General Practice'}</p>
+                  <p className="text-sm font-medium text-foreground mt-1 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {format(new Date(nextAppointment.scheduled_time), 'PPp')}
+                  </p>
+                </div>
+              </div>
+              <Button size="lg" className="gap-2" asChild>
+                <Link to={`/patient/appointments/${nextAppointment._id}`}>
+                  <Video className="h-4 w-4" />
+                  Join
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Upcoming Appointments
-            </CardTitle>
-            <CardDescription>Your scheduled consultations</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  Upcoming Appointments
+                </CardTitle>
+                <CardDescription>Your scheduled consultations</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/patient/appointments">View All</Link>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
-            ) : upcomingAppointments.length > 0 ? (
               <div className="space-y-4">
-                {upcomingAppointments.map((appointment) => (
-                  <div
-                    key={appointment._id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                  >
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse"></div>
+                ))}
+              </div>
+            ) : recentAppointments.length > 0 ? (
+              <div className="space-y-3">
+                {recentAppointments.map((appointment) => (
+                  <div key={appointment._id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/5 hover:border-primary/30 transition-all group">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-secondary flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-secondary-foreground" />
+                      <div className="h-14 w-14 rounded-full bg-gradient-secondary flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                        <Stethoscope className="h-6 w-6 text-secondary-foreground" />
                       </div>
                       <div>
-                        <p className="font-medium">
-                          {appointment.doctor?.name || 'Doctor'}
-                        </p>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
+                        <p className="font-semibold text-foreground">Dr. {appointment.doctor?.name || 'Doctor'}</p>
+                        <p className="text-xs text-muted-foreground">{appointment.doctorProfile?.specialty || 'General Practice'}</p>
+                        <p className="text-sm text-foreground mt-1 flex items-center gap-1 font-medium">
+                          <Clock className="w-3 h-3 text-primary" />
                           {format(new Date(appointment.scheduled_time), 'PPp')}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{appointment.status}</Badge>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link to={`/patient/appointments/${appointment._id}`}>
-                          View
-                        </Link>
+                      <Badge variant="secondary" className="capitalize">{appointment.status}</Badge>
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to={`/patient/appointments/${appointment._id}`}>View</Link>
                       </Button>
                     </div>
                   </div>
                 ))}
-                {appointments.length > 3 && (
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/patient/appointments">View All Appointments</Link>
-                  </Button>
-                )}
               </div>
             ) : (
               <div className="text-center py-12">
-                <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">No upcoming appointments</p>
-                <Button asChild>
+                <div className="h-20 w-20 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                  <Calendar className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-4 font-medium">No upcoming appointments</p>
+                <Button asChild className="gap-2">
                   <Link to="/patient/appointments/book">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Book Appointment
+                    <Plus className="w-4 h-4" />
+                    Book Your First Appointment
                   </Link>
                 </Button>
               </div>
@@ -166,32 +243,61 @@ const PatientDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button className="w-full justify-start" variant="outline" asChild>
-              <Link to="/patient/appointments/book">
-                <Plus className="w-4 h-4 mr-2" />
-                Book Appointment
-              </Link>
-            </Button>
-            <Button className="w-full justify-start" variant="outline" asChild>
-              <Link to="/patient/messages">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Send Message
-              </Link>
-            </Button>
-            <Button className="w-full justify-start" variant="outline" asChild>
-              <Link to="/patient/profile">
-                <Calendar className="w-4 h-4 mr-2" />
-                Update Profile
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
+              <CardDescription>Common tasks</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button className="w-full justify-start gap-3 h-auto py-3" variant="outline" asChild>
+                <Link to="/patient/appointments/book">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Plus className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-medium">Book Appointment</p>
+                    <p className="text-xs text-muted-foreground">Schedule consultation</p>
+                  </div>
+                </Link>
+              </Button>
+              <Button className="w-full justify-start gap-3 h-auto py-3" variant="outline" asChild>
+                <Link to="/patient/messages">
+                  <div className="h-8 w-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <MessageSquare className="w-4 h-4 text-secondary" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-medium">Messages</p>
+                    <p className="text-xs text-muted-foreground">Chat with doctors</p>
+                  </div>
+                </Link>
+              </Button>
+              <Button className="w-full justify-start gap-3 h-auto py-3" variant="outline" asChild>
+                <Link to="/patient/prescriptions">
+                  <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-accent" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-medium">Prescriptions</p>
+                    <p className="text-xs text-muted-foreground">View medications</p>
+                  </div>
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-secondary/10 to-transparent border-secondary/30">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-secondary" />
+                <CardTitle className="text-lg">Health Tip</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Stay hydrated! Aim to drink at least 8 glasses of water daily to maintain optimal health.</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
