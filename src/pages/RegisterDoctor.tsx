@@ -78,7 +78,7 @@ const RegisterDoctor = () => {
         description: 'Your doctor profile is pending verification. You will be notified once approved.',
       });
 
-      navigate('/login');
+      setStep(3); // Show success screen
     } catch (error) {
       toast({
         title: 'Registration failed',

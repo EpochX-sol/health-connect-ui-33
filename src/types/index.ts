@@ -27,10 +27,21 @@ export interface DoctorProfile {
 export interface Appointment {
   _id: string;
   patient_id: string;
-  doctor_id: string;
+  doctor_id: string | {
+    _id: string;
+    user_id: User;
+    specialty: string;
+    isVerified: boolean;
+  };
   scheduled_time: string;
-  status: 'booked' | 'completed' | 'cancelled';
+  dateTime?: string;
+  status: 'booked' | 'completed' | 'cancelled' | 'in-progress';
   roomName: string;
+  type?: string;
+  notes?: string;
+  payment_id?: {
+    amount: number;
+  };
   createdAt: string;
   patient?: User;
   doctor?: User;
