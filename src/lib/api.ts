@@ -74,6 +74,19 @@ export const api = {
     return response.json();
   },
 
+  updateDoctorProfile: async (id: string, data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/doctors/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to update doctor profile');
+    return response.json();
+  },
+
   // Appointment endpoints
   createAppointment: async (data: any, token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointments`, {
@@ -162,6 +175,19 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error('Failed to fetch prescription');
+    return response.json();
+  },
+
+  createPrescription: async (data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/prescriptions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to create prescription');
     return response.json();
   },
 
