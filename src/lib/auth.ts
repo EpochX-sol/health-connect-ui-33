@@ -33,3 +33,7 @@ export const requireAuth = (): AuthData => {
   }
   return auth;
 };
+
+export const getAuthData = (): AuthData | null => {
+  return authStorage.get();
+};
