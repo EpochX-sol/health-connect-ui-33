@@ -15,6 +15,13 @@ import PatientAppointments from "./pages/patient/Appointments";
 import BookAppointment from "./pages/patient/BookAppointment";
 import PatientMessages from "./pages/patient/Messages";
 import PatientPrescriptions from "./pages/patient/Prescriptions";
+import DoctorLayout from "./components/doctor/DoctorLayout";
+import DoctorDashboard from "./pages/doctor/Dashboard";
+import DoctorProfile from "./pages/doctor/Profile";
+import DoctorAppointments from "./pages/doctor/Appointments";
+import DoctorPatients from "./pages/doctor/Patients";
+import DoctorPrescriptions from "./pages/doctor/Prescriptions";
+import DoctorMessages from "./pages/doctor/Messages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +46,15 @@ const App = () => (
               <Route path="appointments/book" element={<BookAppointment />} />
               <Route path="messages" element={<PatientMessages />} />
               <Route path="prescriptions" element={<PatientPrescriptions />} />
+            </Route>
+
+            <Route path="/doctor" element={<DoctorLayout />}>
+              <Route path="dashboard" element={<DoctorDashboard />} />
+              <Route path="profile" element={<DoctorProfile />} />
+              <Route path="appointments" element={<DoctorAppointments />} />
+              <Route path="patients" element={<DoctorPatients />} />
+              <Route path="prescriptions" element={<DoctorPrescriptions />} />
+              <Route path="messages" element={<DoctorMessages />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
