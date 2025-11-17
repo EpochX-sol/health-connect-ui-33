@@ -32,7 +32,7 @@ const specialties = [
 ];
 
 const BookAppointment = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -42,6 +42,8 @@ const BookAppointment = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('All Specialties');
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorProfile | null>(null);
+  const [selectedDoctorUser, setSelectedDoctorUser] = useState<{ name: string } | null>(null);
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [booking, setBooking] = useState(false);
@@ -56,10 +58,22 @@ const BookAppointment = () => {
 
   const fetchDoctors = async () => {
     try {
-      const data = await api.getDoctors(token);
+      const data = await api.getAllDoctors();
       const verified = data.filter((doc: DoctorProfile) => doc.isVerified);
       setDoctors(verified);
       setFilteredDoctors(verified);
+
+      // Fetch doctor names by their user IDs
+      const names: Record<string, string> = {};
+      await Promise.all(verified.map(async (doc: DoctorProfile) => {
+        try {
+          const userData = await api.getUser(doc.user_id);
+          names[doc.user_id] = userData.name;
+        } catch {
+          names[doc.user_id] = 'Unknown Doctor';
+        }
+      }));
+      setDoctorNames(names);
     } catch (error) {
       toast({
         title: 'Failed to load doctors',
@@ -69,6 +83,22 @@ const BookAppointment = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const fetchDoctorUser = async () => {
+      if (selectedDoctor) {
+        try {
+          const userData = await api.getUser(selectedDoctor.user_id);
+          setSelectedDoctorUser(userData);
+        } catch {
+          setSelectedDoctorUser(null);
+        }
+      } else {
+        setSelectedDoctorUser(null);
+      }
+    };
+    fetchDoctorUser();
+  }, [selectedDoctor]);
 
   const filterDoctors = () => {
     let filtered = doctors;
@@ -103,13 +133,11 @@ const BookAppointment = () => {
       const [hours, minutes] = selectedTime.split(':');
       scheduledTime.setHours(parseInt(hours), parseInt(minutes));
 
-      const appointment = await api.createAppointment(
-        {
-          doctor_id: selectedDoctor.user_id,
-          scheduled_time: scheduledTime.toISOString(),
-        },
-        token!
-      );
+      const appointment = await api.createAppointment({
+        patient_id: user?._id!,
+        doctor_id: selectedDoctor.user_id,
+        scheduled_time: scheduledTime.toISOString(),
+      });
 
       toast({
         title: 'Appointment booked!',
@@ -126,7 +154,7 @@ const BookAppointment = () => {
       setBooking(false);
     }
   };
-
+console.log('Selected Doctor:', selectedDoctor);
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
@@ -197,7 +225,7 @@ const BookAppointment = () => {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div>
                             <h3 className="font-semibold text-lg text-foreground">
-                              Dr. {doctor.user?.name}
+                              Dr. {doctorNames[doctor.user_id] || doctor.user?.name || 'Unknown Doctor'}
                             </h3>
                             <Badge variant="secondary" className="mt-1">
                               {doctor.specialty}
@@ -247,7 +275,7 @@ const BookAppointment = () => {
                   <Stethoscope className="h-8 w-8 text-secondary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">Dr. {selectedDoctor.user?.name}</h3>
+                  <h3 className="font-semibold text-lg">Dr. {selectedDoctorUser?.name || selectedDoctor.user?.name || '...'}</h3>
                   <Badge variant="secondary" className="mt-1">{selectedDoctor.specialty}</Badge>
                 </div>
               </div>

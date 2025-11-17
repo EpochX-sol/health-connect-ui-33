@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { Appointment, Prescription } from '@/types';
 import { 
@@ -15,7 +14,6 @@ import {
   Plus, 
   Activity, 
   FileText, 
-  TrendingUp,
   Stethoscope,
   Pill,
   Heart
@@ -31,46 +29,96 @@ const PatientDashboard = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (token) {
+    if (token && user?._id) {
       fetchData();
     }
-  }, [token]);
+  }, [token, user?._id]);
 
   const fetchData = async () => {
     try {
+      setLoading(true);
+      console.log('Fetching data for user:', user?._id);
+      console.log('Token:', token);
+
       const [appointmentsData, prescriptionsData] = await Promise.all([
-        api.getAppointments(token!),
-        api.getPrescriptions(token!)
+        api.getAppointmentsForPatient(user!._id, token!),
+        api.getAllPrescriptions(token!, user!._id)
       ]);
-      setAppointments(appointmentsData);
-      setPrescriptions(prescriptionsData);
+
+      console.log('Appointments received:', appointmentsData);
+      console.log('Prescriptions received:', prescriptionsData);
+
+      setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
+      setPrescriptions(Array.isArray(prescriptionsData) ? prescriptionsData : []);
     } catch (error) {
+      console.error('Error fetching dashboard data:', error);
       toast({
         title: 'Failed to load data',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
         variant: 'destructive',
       });
+      setAppointments([]);
+      setPrescriptions([]);
     } finally {
       setLoading(false);
     }
   };
 
   const upcomingAppointments = appointments
-    .filter((apt) => apt.status === 'booked' && new Date(apt.scheduled_time) > new Date())
-    .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime());
+    .filter((apt) => {
+      try {
+        return apt.status === 'booked' && new Date(apt.scheduled_time) > new Date();
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => {
+      try {
+        return new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime();
+      } catch {
+        return 0;
+      }
+    });
 
   const recentAppointments = upcomingAppointments.slice(0, 3);
   const completedCount = appointments.filter((apt) => apt.status === 'completed').length;
   const nextAppointment = upcomingAppointments[0];
 
   const getAppointmentTimeLabel = (date: Date) => {
-    if (isToday(date)) return 'Today';
-    if (isTomorrow(date)) return 'Tomorrow';
-    return format(date, 'MMM dd');
+    try {
+      if (isToday(date)) return 'Today';
+      if (isTomorrow(date)) return 'Tomorrow';
+      return format(date, 'MMM dd');
+    } catch {
+      return 'Scheduled';
+    }
   };
+
+  const getDoctorName = (appointment: Appointment) => {
+    return appointment.doctor?.name || 
+           appointment.doctorProfile?.user?.name || 
+           'Doctor';
+  };
+
+  const getDoctorSpecialty = (appointment: Appointment) => {
+    return appointment.doctorProfile?.specialty || 'General Practice';
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <div className="h-32 bg-muted rounded-2xl animate-pulse"></div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 bg-muted rounded-lg animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Welcome Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-primary p-8 text-primary-foreground shadow-lg">
         <div className="relative z-10">
           <h1 className="text-4xl font-bold mb-2">Welcome back, {user?.name}!</h1>
@@ -80,7 +128,6 @@ const PatientDashboard = () => {
         <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/10 blur-3xl"></div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-primary/20 bg-card hover:shadow-lg transition-all hover:-translate-y-1">
           <CardHeader className="pb-3">
@@ -148,7 +195,9 @@ const PatientDashboard = () => {
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
               <CardTitle>Next Appointment</CardTitle>
-              <Badge className="ml-auto">{getAppointmentTimeLabel(new Date(nextAppointment.scheduled_time))}</Badge>
+              <Badge className="ml-auto">
+                {getAppointmentTimeLabel(new Date(nextAppointment.scheduled_time))}
+              </Badge>
             </div>
           </CardHeader>
           <CardContent>
@@ -158,8 +207,8 @@ const PatientDashboard = () => {
                   <Stethoscope className="h-8 w-8 text-secondary-foreground" />
                 </div>
                 <div>
-                  <p className="font-semibold text-lg text-foreground">Dr. {nextAppointment.doctor?.name || 'Doctor'}</p>
-                  <p className="text-sm text-muted-foreground">{nextAppointment.doctorProfile?.specialty || 'General Practice'}</p>
+                  <p className="font-semibold text-lg text-foreground">Dr. {getDoctorName(nextAppointment)}</p>
+                  <p className="text-sm text-muted-foreground">{getDoctorSpecialty(nextAppointment)}</p>
                   <p className="text-sm font-medium text-foreground mt-1 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {format(new Date(nextAppointment.scheduled_time), 'PPp')}
@@ -194,13 +243,7 @@ const PatientDashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse"></div>
-                ))}
-              </div>
-            ) : recentAppointments.length > 0 ? (
+            {recentAppointments.length > 0 ? (
               <div className="space-y-3">
                 {recentAppointments.map((appointment) => (
                   <div key={appointment._id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/5 hover:border-primary/30 transition-all group">
@@ -209,8 +252,8 @@ const PatientDashboard = () => {
                         <Stethoscope className="h-6 w-6 text-secondary-foreground" />
                       </div>
                       <div>
-                        <p className="font-semibold text-foreground">Dr. {appointment.doctor?.name || 'Doctor'}</p>
-                        <p className="text-xs text-muted-foreground">{appointment.doctorProfile?.specialty || 'General Practice'}</p>
+                        <p className="font-semibold text-foreground">Dr. {getDoctorName(appointment)}</p>
+                        <p className="text-xs text-muted-foreground">{getDoctorSpecialty(appointment)}</p>
                         <p className="text-sm text-foreground mt-1 flex items-center gap-1 font-medium">
                           <Clock className="w-3 h-3 text-primary" />
                           {format(new Date(appointment.scheduled_time), 'PPp')}

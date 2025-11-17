@@ -26,6 +26,7 @@ const Appointments = () => {
   const [loading, setLoading] = useState(true);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -40,9 +41,23 @@ const Appointments = () => {
         navigate('/login');
         return;
       }
+      console.log('Patient ID:', authData.user);
 
-      const data = await api.getAppointments(authData.token);
+      const data = await api.getAppointmentsForPatient(authData.user._id);
       setAppointments(data);
+
+      // Fetch doctor names by their IDs
+      const uniqueDoctorIds = Array.from(new Set(data.map((apt: Appointment) => typeof apt.doctor_id === 'string' ? apt.doctor_id : null).filter(Boolean))) as string[];
+      const names: Record<string, string> = {};
+      await Promise.all(uniqueDoctorIds.map(async (id: string) => {
+        try {
+          const userData = await api.getUser(id);
+          names[id] = userData.name;
+        } catch {
+          names[id] = 'Unknown Doctor';
+        }
+      }));
+      setDoctorNames(names);
     } catch (error) {
       toast({
         title: 'Failed to load appointments',
@@ -59,7 +74,7 @@ const Appointments = () => {
       const authData = getAuthData();
       if (!authData) return;
 
-      await api.cancelAppointment(id, authData.token);
+      await api.deleteAppointment(id);
       toast({
         title: 'Appointment cancelled',
         description: 'Your appointment has been cancelled successfully.',
@@ -151,6 +166,7 @@ const Appointments = () => {
             appointments={filteredAppointments}
             onCancel={setCancelingId}
             getStatusBadge={getStatusBadge}
+            doctorNames={doctorNames}
           />
         </TabsContent>
         <TabsContent value="upcoming" className="mt-6">
@@ -158,6 +174,7 @@ const Appointments = () => {
             appointments={filteredAppointments}
             onCancel={setCancelingId}
             getStatusBadge={getStatusBadge}
+            doctorNames={doctorNames}
           />
         </TabsContent>
         <TabsContent value="completed" className="mt-6">
@@ -165,6 +182,7 @@ const Appointments = () => {
             appointments={filteredAppointments}
             onCancel={setCancelingId}
             getStatusBadge={getStatusBadge}
+            doctorNames={doctorNames}
           />
         </TabsContent>
         <TabsContent value="cancelled" className="mt-6">
@@ -172,6 +190,7 @@ const Appointments = () => {
             appointments={filteredAppointments}
             onCancel={setCancelingId}
             getStatusBadge={getStatusBadge}
+            doctorNames={doctorNames}
           />
         </TabsContent>
       </Tabs>
@@ -203,9 +222,10 @@ interface AppointmentsListProps {
   appointments: Appointment[];
   onCancel: (id: string) => void;
   getStatusBadge: (status: string) => JSX.Element;
+  doctorNames: Record<string, string>;
 }
 
-const AppointmentsList = ({ appointments, onCancel, getStatusBadge }: AppointmentsListProps) => {
+const AppointmentsList = ({ appointments, onCancel, getStatusBadge, doctorNames }: AppointmentsListProps) => {
   if (appointments.length === 0) {
     return (
       <Card className="border-dashed">
@@ -223,8 +243,9 @@ const AppointmentsList = ({ appointments, onCancel, getStatusBadge }: Appointmen
   return (
     <div className="grid gap-4">
       {appointments.map((appointment) => {
+        const doctorId = typeof appointment.doctor_id === 'string' ? appointment.doctor_id : null;
+        const doctorName = doctorId ? doctorNames[doctorId] || 'Unknown Doctor' : 'Unknown Doctor';
         const doctorData = typeof appointment.doctor_id === 'object' ? appointment.doctor_id : null;
-        const doctorName = doctorData?.user_id?.name || 'Unknown Doctor';
         const isVerified = doctorData?.isVerified || false;
         const specialty = doctorData?.specialty || 'General Practice';
         const appointmentTime = appointment.dateTime || appointment.scheduled_time;

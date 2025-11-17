@@ -13,22 +13,39 @@ import { FileText, Download, Printer, Search, Pill, Calendar, User, Stethoscope,
 import { format } from 'date-fns';
 
 const PatientPrescriptions = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { toast } = useToast();
   
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchPrescriptions();
-  }, [token]);
+  }, [token, user]); 
 
   const fetchPrescriptions = async () => {
+    if (!token || !user) return;
+
     try {
-      const data = await api.getPrescriptions(token!);
+      const data = await api.getAllPrescriptions(token, user._id);
       setPrescriptions(data);
+
+      // Fetch doctor names for all prescriptions
+      const doctorIds = [...new Set(data.map((rx: Prescription) => rx.doctor_id))];
+      if (doctorIds.length > 0) {
+        const doctorPromises = doctorIds.map(doctorId => 
+          api.getUser(doctorId, token)
+        );
+        const doctorResults = await Promise.all(doctorPromises);
+        const names: Record<string, string> = {};
+        doctorResults.forEach((doc) => {
+          names[doc._id] = doc.name;
+        });
+        setDoctorNames(names);
+      }
     } catch (error) {
       toast({
         title: 'Failed to load prescriptions',
@@ -118,7 +135,7 @@ const PatientPrescriptions = () => {
                               <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Stethoscope className="h-3 w-3" />
-                                  Dr. {prescription.doctor?.name}
+                                  Dr. {doctorNames[prescription.doctor_id] || 'Unknown Doctor'}
                                 </span>
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
@@ -239,7 +256,7 @@ const PatientPrescriptions = () => {
                     <User className="h-6 w-6 text-secondary-foreground" />
                   </div>
                   <div>
-                    <p className="font-semibold">Dr. {selectedPrescription.doctor?.name}</p>
+                    <p className="font-semibold">Dr. {doctorNames[selectedPrescription.doctor_id] || selectedPrescription.doctor?.name || 'Unknown Doctor'}</p>
                     <p className="text-sm text-muted-foreground">{selectedPrescription.doctor?.email}</p>
                   </div>
                 </div>

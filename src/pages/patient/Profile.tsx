@@ -28,7 +28,7 @@ const PatientProfile = () => {
     setLoading(true);
     
     try {
-      const updatedUser = await api.updateUser(user!._id, formData, token!);
+      const updatedUser = await api.updateUser(user!._id, formData);
       updateUser(updatedUser);
       setIsEditing(false);
       toast({

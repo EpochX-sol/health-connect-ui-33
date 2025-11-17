@@ -19,10 +19,10 @@ const DoctorDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!token || !user) return;
-      
+      console.log(token, user);
       try {
         const [appointmentsData, profileData] = await Promise.all([
-          api.getAppointments(token),
+          api.getAppointments(token,user),
           api.getDoctorProfile(user._id, token)
         ]);
         
