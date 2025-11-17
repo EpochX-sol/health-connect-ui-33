@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = 'https://proj-babi.onrender.com/api';
 
 export const api = {
   register: async (data: { name: string; email: string; password: string; role: string }) => {
