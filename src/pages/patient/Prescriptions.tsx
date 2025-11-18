@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { Prescription } from '@/types';
-import { FileText, Download, Printer, Search, Pill, Calendar, User, Stethoscope, ClipboardList } from 'lucide-react';
+import { FileText, Download, Printer, Search, Pill, Calendar, User, Stethoscope, ClipboardList, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
+import { PrescriptionPDF, printPrescription } from '@/components/PrescriptionPDF';
 
 const PatientPrescriptions = () => {
   const { token, user } = useAuth();
@@ -37,7 +38,7 @@ const PatientPrescriptions = () => {
       const doctorIds = [...new Set(data.map((rx: Prescription) => rx.doctor_id))];
       if (doctorIds.length > 0) {
         const doctorPromises = doctorIds.map(doctorId => 
-          api.getUser(doctorId, token)
+          api.getUser(String(doctorId), token)
         );
         const doctorResults = await Promise.all(doctorPromises);
         const names: Record<string, string> = {};
@@ -64,6 +65,12 @@ const PatientPrescriptions = () => {
   );
 
   const handleDownload = (prescription: Prescription) => {
+    const blob = new Blob([document.getElementById('prescription-pdf')?.innerHTML || ''], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prescription-${prescription._id}.html`;
+    a.click();
     toast({
       title: 'Download started',
       description: 'Prescription is being downloaded...',
@@ -71,7 +78,10 @@ const PatientPrescriptions = () => {
   };
 
   const handlePrint = (prescription: Prescription) => {
-    window.print();
+    setSelectedPrescription(prescription);
+    setTimeout(() => {
+      printPrescription();
+    }, 100);
   };
 
   return (

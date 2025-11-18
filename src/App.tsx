@@ -15,6 +15,9 @@ import PatientAppointments from "./pages/patient/Appointments";
 import BookAppointment from "./pages/patient/BookAppointment";
 import PatientMessages from "./pages/patient/Messages";
 import PatientPrescriptions from "./pages/patient/Prescriptions";
+import VideoCall from "./pages/VideoCall";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
 import DoctorLayout from "./components/doctor/DoctorLayout";
 import DoctorDashboard from "./pages/doctor/Dashboard";
 import DoctorProfile from "./pages/doctor/Profile";
@@ -36,8 +39,14 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register/patient" element={<RegisterPatient />} />
-            <Route path="/register/doctor" element={<RegisterDoctor />} />
+          <Route path="/register/patient" element={<RegisterPatient />} />
+          <Route path="/register/doctor" element={<RegisterDoctor />} />
+          <Route path="/video/:roomName" element={<VideoCall />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+          </Route>
             
             <Route path="/patient" element={<PatientLayout />}>
               <Route path="dashboard" element={<PatientDashboard />} />

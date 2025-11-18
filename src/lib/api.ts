@@ -219,6 +219,17 @@ export const api = {
     return result;
   },
 
+  getAppointments: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/appointments`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch appointments');
+    const result = await response.json();
+    console.log('getAppointments:', result);
+    return result;
+  },
+
   updateAppointment: async (id: string, data: any, token?: string) => {
     const headers: any = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -287,6 +298,17 @@ export const api = {
     if (!response.ok) throw new Error('Failed to fetch messages');
     const result = await response.json();
     console.log('getMessagesBetweenUsers:', result);
+    return result;
+  },
+
+  getMessages: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/messages`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch messages');
+    const result = await response.json();
+    console.log('getMessages:', result);
     return result;
   },
 

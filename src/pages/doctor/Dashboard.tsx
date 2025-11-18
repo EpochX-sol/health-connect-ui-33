@@ -22,7 +22,7 @@ const DoctorDashboard = () => {
       console.log(token, user);
       try {
         const [appointmentsData, profileData] = await Promise.all([
-          api.getAppointments(token,user),
+          api.getAppointments(token),
           api.getDoctorProfile(user._id, token)
         ]);
         
