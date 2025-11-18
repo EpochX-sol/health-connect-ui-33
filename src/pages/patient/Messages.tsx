@@ -66,9 +66,14 @@ const PatientMessages = () => {
 
     setSending(true);
     try {
+      const doctorId = typeof selectedAppointment.doctor_id === 'string' 
+        ? selectedAppointment.doctor_id 
+        : selectedAppointment.doctor_id._id;
+      
       const newMessage = await api.sendMessage(
         {
-          receiver_id: selectedAppointment.doctor_id,
+          sender_id: user!._id,
+          receiver_id: doctorId,
           appointment_id: selectedAppointment._id,
           content: messageText,
         },

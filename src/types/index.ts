@@ -20,6 +20,7 @@ export interface DoctorProfile {
   isVerified: boolean;
   verificationStatus: 'pending' | 'approved' | 'rejected';
   verificationNotes?: string;
+  pricePerHour?: number;
   createdAt: string;
   user?: User;
 }

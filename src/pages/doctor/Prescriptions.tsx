@@ -37,7 +37,7 @@ const DoctorPrescriptions = () => {
 
     try {
       const [prescData, aptData] = await Promise.all([
-        api.getPrescriptions(token),
+        api.getAllPrescriptions(token),
         api.getAppointments(token)
       ]);
       
