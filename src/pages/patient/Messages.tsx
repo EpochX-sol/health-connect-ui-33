@@ -10,9 +10,10 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { Message, Appointment } from '@/types';
-import { Send, MessageSquare, Clock, Stethoscope, Search } from 'lucide-react';
+import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { CallModal } from '@/components/CallModal';
 
 const PatientMessages = () => {
   const { user, token } = useAuth();
@@ -26,6 +27,8 @@ const PatientMessages = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCallOpen, setIsCallOpen] = useState(false);
+  const [callType, setCallType] = useState<'voice' | 'video'>('voice');
 
   useEffect(() => {
     fetchData();
@@ -197,24 +200,50 @@ const PatientMessages = () => {
           {selectedAppointment ? (
             <>
               <CardHeader className="border-b">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12 border-2 border-background">
-                    <AvatarFallback className="bg-gradient-secondary text-secondary-foreground">
-                      {getInitials(selectedAppointment.doctor?.name || 'D')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">
-                      Dr. {selectedAppointment.doctor?.name}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Stethoscope className="h-3 w-3" />
-                      {selectedAppointment.doctorProfile?.specialty || 'Doctor'}
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12 border-2 border-background">
+                      <AvatarFallback className="bg-gradient-secondary text-secondary-foreground">
+                        {getInitials(selectedAppointment.doctor?.name || 'D')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">
+                        Dr. {selectedAppointment.doctor?.name}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Stethoscope className="h-3 w-3" />
+                        {selectedAppointment.doctorProfile?.specialty || 'Doctor'}
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="secondary">
-                    {format(new Date(selectedAppointment.scheduled_time), 'MMM dd, yyyy')}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge variant="secondary">
+                      {format(new Date(selectedAppointment.scheduled_time), 'MMM dd, yyyy')}
+                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setCallType('voice');
+                        setIsCallOpen(true);
+                      }}
+                      className="hover:bg-primary hover:text-primary-foreground"
+                    >
+                      <Phone className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setCallType('video');
+                        setIsCallOpen(true);
+                      }}
+                      className="hover:bg-primary hover:text-primary-foreground"
+                    >
+                      <Video className="h-5 w-5" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
 
@@ -315,6 +344,16 @@ const PatientMessages = () => {
           )}
         </Card>
       </div>
+
+      <CallModal
+        isOpen={isCallOpen}
+        onClose={() => setIsCallOpen(false)}
+        isVideoCall={callType === 'video'}
+        participantName={selectedAppointment?.doctor?.name || 'Doctor'}
+        participantInitials={selectedAppointment?.doctor?.name 
+          ? getInitials(selectedAppointment.doctor.name) 
+          : 'D'}
+      />
     </div>
   );
 };

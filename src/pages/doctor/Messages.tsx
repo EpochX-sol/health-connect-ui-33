@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, MessageSquare, User } from 'lucide-react';
+import { Send, MessageSquare, User, Phone, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import type { Message, Appointment } from '@/types';
+import { CallModal } from '@/components/CallModal';
 
 interface Conversation {
   appointment: Appointment;
@@ -25,6 +26,8 @@ const DoctorMessages = () => {
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [isCallOpen, setIsCallOpen] = useState(false);
+  const [callType, setCallType] = useState<'voice' | 'video'>('voice');
 
   useEffect(() => {
     fetchData();
@@ -198,21 +201,47 @@ const DoctorMessages = () => {
               <>
                 {/* Chat Header */}
                 <div className="p-4 border-b border-border bg-muted/30">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback className="bg-medical-200 text-medical-700">
-                        {selectedConversation.appointment.patient?.name 
-                          ? getInitials(selectedConversation.appointment.patient.name) 
-                          : 'P'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {selectedConversation.appointment.patient?.name || 'Patient'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedConversation.appointment.patient?.email}
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarFallback className="bg-medical-200 text-medical-700">
+                          {selectedConversation.appointment.patient?.name 
+                            ? getInitials(selectedConversation.appointment.patient.name) 
+                            : 'P'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {selectedConversation.appointment.patient?.name || 'Patient'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedConversation.appointment.patient?.email}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          setCallType('voice');
+                          setIsCallOpen(true);
+                        }}
+                        className="hover:bg-primary hover:text-primary-foreground"
+                      >
+                        <Phone className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          setCallType('video');
+                          setIsCallOpen(true);
+                        }}
+                        className="hover:bg-primary hover:text-primary-foreground"
+                      >
+                        <Video className="h-5 w-5" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -277,6 +306,16 @@ const DoctorMessages = () => {
           </Card>
         </div>
       )}
+
+      <CallModal
+        isOpen={isCallOpen}
+        onClose={() => setIsCallOpen(false)}
+        isVideoCall={callType === 'video'}
+        participantName={selectedConversation?.appointment.patient?.name || 'Patient'}
+        participantInitials={selectedConversation?.appointment.patient?.name 
+          ? getInitials(selectedConversation.appointment.patient.name) 
+          : 'P'}
+      />
     </div>
   );
 };
