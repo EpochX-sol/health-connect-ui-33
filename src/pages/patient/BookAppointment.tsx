@@ -236,9 +236,17 @@ console.log('Selected Doctor:', selectedDoctor);
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                           {doctor.bio}
                         </p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Award className="h-4 w-4" />
-                          <span>License: {doctor.medicalLicenseNumber}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Award className="h-4 w-4" />
+                            <span>License: {doctor.medicalLicenseNumber}</span>
+                          </div>
+                          {doctor.pricePerHour && (
+                            <div className="flex items-center gap-1 text-sm font-semibold text-primary">
+                              <span>${doctor.pricePerHour}</span>
+                              <span className="text-xs text-muted-foreground font-normal">/hr</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -280,6 +288,12 @@ console.log('Selected Doctor:', selectedDoctor);
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">{selectedDoctor.bio}</p>
+              {selectedDoctor.pricePerHour && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Consultation Fee</p>
+                  <p className="text-2xl font-bold text-primary">${selectedDoctor.pricePerHour}<span className="text-sm font-normal text-muted-foreground">/hour</span></p>
+                </div>
+              )}
               <Button
                 variant="outline"
                 className="w-full"

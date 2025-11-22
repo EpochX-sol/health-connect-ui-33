@@ -51,6 +51,13 @@ const DoctorDashboard = () => {
   const completedCount = appointments.filter(apt => apt.status === 'completed').length;
   const totalPatients = new Set(appointments.map(apt => apt.patient_id)).size;
 
+  // Calculate total earnings from completed appointments
+  const totalEarnings = appointments
+    .filter(apt => apt.status === 'completed')
+    .reduce((sum, apt) => {
+      return sum + (apt.payment_id?.amount || doctorProfile?.pricePerHour || 0);
+    }, 0);
+
   const stats = [
     {
       title: 'Today\'s Appointments',
@@ -115,6 +122,28 @@ const DoctorDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Available Balance Card */}
+      <Card className="border-none shadow-elegant bg-gradient-to-br from-success-50 to-success-100">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-success-900 mb-2">Available Balance</p>
+              <p className="text-4xl font-bold text-success-600">${totalEarnings.toFixed(2)}</p>
+              <p className="text-xs text-success-700 mt-2">From {completedCount} completed appointments</p>
+              <Button 
+                className="mt-4 bg-success-600 hover:bg-success-700 text-white"
+                size="sm"
+              >
+                Request Withdrawal
+              </Button>
+            </div>
+            <div className="p-3 bg-white/60 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-success-600" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
