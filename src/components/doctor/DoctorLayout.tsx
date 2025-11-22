@@ -66,66 +66,66 @@ const DoctorLayout = () => {
         </div>
       </header>
 
-      {/* Navigation */}
-      <nav className="bg-background/60 backdrop-blur border-b border-border">
-        <div className="container mx-auto px-4">
-          <div className="flex gap-1 overflow-x-auto">
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-64 min-h-screen bg-background/60 backdrop-blur border-r border-border sticky top-[73px] self-start">
+          <nav className="p-4 space-y-1">
             <NavLink
               to="/doctor/dashboard"
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors border-b-2 border-transparent hover:border-medical-500"
-              activeClassName="text-medical-600 border-medical-500"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
+              activeClassName="text-medical-600 bg-medical-100"
             >
-              <LayoutDashboard className="h-4 w-4" />
+              <LayoutDashboard className="h-5 w-5" />
               Dashboard
             </NavLink>
             <NavLink
               to="/doctor/profile"
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors border-b-2 border-transparent hover:border-medical-500"
-              activeClassName="text-medical-600 border-medical-500"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
+              activeClassName="text-medical-600 bg-medical-100"
             >
-              <UserCircle className="h-4 w-4" />
+              <UserCircle className="h-5 w-5" />
               Profile
             </NavLink>
             <NavLink
               to="/doctor/appointments"
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors border-b-2 border-transparent hover:border-medical-500"
-              activeClassName="text-medical-600 border-medical-500"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
+              activeClassName="text-medical-600 bg-medical-100"
             >
-              <Calendar className="h-4 w-4" />
+              <Calendar className="h-5 w-5" />
               Appointments
             </NavLink>
             <NavLink
               to="/doctor/patients"
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors border-b-2 border-transparent hover:border-medical-500"
-              activeClassName="text-medical-600 border-medical-500"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
+              activeClassName="text-medical-600 bg-medical-100"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-5 w-5" />
               Patients
             </NavLink>
             <NavLink
               to="/doctor/prescriptions"
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors border-b-2 border-transparent hover:border-medical-500"
-              activeClassName="text-medical-600 border-medical-500"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
+              activeClassName="text-medical-600 bg-medical-100"
             >
-              <FileText className="h-4 w-4" />
+              <FileText className="h-5 w-5" />
               Prescriptions
             </NavLink>
             <NavLink
               to="/doctor/messages"
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors border-b-2 border-transparent hover:border-medical-500"
-              activeClassName="text-medical-600 border-medical-500"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
+              activeClassName="text-medical-600 bg-medical-100"
             >
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-5 w-5" />
               Messages
             </NavLink>
-          </div>
-        </div>
-      </nav>
+          </nav>
+        </aside>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <Outlet />
-      </main>
+        {/* Main Content */}
+        <main className="flex-1 p-8">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };
