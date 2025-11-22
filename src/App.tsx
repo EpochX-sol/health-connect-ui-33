@@ -15,7 +15,6 @@ import PatientAppointments from "./pages/patient/Appointments";
 import BookAppointment from "./pages/patient/BookAppointment";
 import PatientMessages from "./pages/patient/Messages";
 import PatientPrescriptions from "./pages/patient/Prescriptions";
-import VideoCall from "./pages/VideoCall";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import DoctorLayout from "./components/doctor/DoctorLayout";
@@ -41,7 +40,6 @@ const App = () => (
             <Route path="/login" element={<Login />} />
           <Route path="/register/patient" element={<RegisterPatient />} />
           <Route path="/register/doctor" element={<RegisterDoctor />} />
-          <Route path="/video/:roomName" element={<VideoCall />} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -52,7 +50,7 @@ const App = () => (
               <Route path="dashboard" element={<PatientDashboard />} />
               <Route path="profile" element={<PatientProfile />} />
               <Route path="appointments" element={<PatientAppointments />} />
-              <Route path="appointments/book" element={<BookAppointment />} />
+              <Route path="book-appointment" element={<BookAppointment />} />
               <Route path="messages" element={<PatientMessages />} />
               <Route path="prescriptions" element={<PatientPrescriptions />} />
             </Route>

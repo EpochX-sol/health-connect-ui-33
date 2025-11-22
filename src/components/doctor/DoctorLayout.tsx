@@ -13,6 +13,17 @@ import {
   Stethoscope
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { 
+  Sidebar, 
+  SidebarContent, 
+  SidebarGroup, 
+  SidebarGroupContent, 
+  SidebarMenu, 
+  SidebarMenuButton, 
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger
+} from '@/components/ui/sidebar';
 
 const DoctorLayout = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -33,25 +44,64 @@ const DoctorLayout = () => {
     return null;
   }
 
+  const menuItems = [
+    { to: '/doctor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/doctor/profile', icon: UserCircle, label: 'Profile' },
+    { to: '/doctor/appointments', icon: Calendar, label: 'Appointments' },
+    { to: '/doctor/patients', icon: Users, label: 'Patients' },
+    { to: '/doctor/prescriptions', icon: FileText, label: 'Prescriptions' },
+    { to: '/doctor/messages', icon: MessageSquare, label: 'Messages' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-medical-50 to-medical-100">
-      {/* Header */}
-      <header className="bg-background/80 backdrop-blur-lg border-b border-border shadow-elegant sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-medical">
-                <Stethoscope className="h-6 w-6 text-white" />
+    <SidebarProvider defaultOpen={true}>
+      <div className="min-h-screen w-full flex">
+        {/* Sidebar */}
+        <Sidebar collapsible="icon">
+          <SidebarContent>
+            <SidebarGroup>
+              <div className="p-4 flex items-center gap-3 border-b border-sidebar-border">
+                <div className="p-2 rounded-lg bg-gradient-medical">
+                  <Stethoscope className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex-1 group-data-[collapsible=icon]:hidden">
+                  <h1 className="text-lg font-bold text-sidebar-foreground">TeleHealth</h1>
+                  <p className="text-xs text-sidebar-foreground/70">Doctor Portal</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">TeleHealth</h1>
-                <p className="text-sm text-muted-foreground">Doctor Portal</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-foreground">Dr. {user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {menuItems.map((item) => (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild tooltip={item.label}>
+                        <NavLink
+                          to={item.to}
+                          className="flex items-center gap-3"
+                          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        >
+                          <item.icon className="h-5 w-5" />
+                          <span>{item.label}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col bg-gradient-to-br from-background via-medical-50 to-medical-100">
+          {/* Header */}
+          <header className="bg-background/80 backdrop-blur-lg border-b border-border shadow-elegant sticky top-0 z-40">
+            <div className="px-4 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <SidebarTrigger />
+                <div className="text-sm">
+                  <p className="font-medium text-foreground">Dr. {user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
               </div>
               <Button 
                 variant="ghost" 
@@ -62,71 +112,15 @@ const DoctorLayout = () => {
                 <LogOut className="h-5 w-5" />
               </Button>
             </div>
-          </div>
+          </header>
+
+          {/* Page Content */}
+          <main className="flex-1 p-8">
+            <Outlet />
+          </main>
         </div>
-      </header>
-
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 min-h-screen bg-background/60 backdrop-blur border-r border-border sticky top-[73px] self-start">
-          <nav className="p-4 space-y-1">
-            <NavLink
-              to="/doctor/dashboard"
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
-              activeClassName="text-medical-600 bg-medical-100"
-            >
-              <LayoutDashboard className="h-5 w-5" />
-              Dashboard
-            </NavLink>
-            <NavLink
-              to="/doctor/profile"
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
-              activeClassName="text-medical-600 bg-medical-100"
-            >
-              <UserCircle className="h-5 w-5" />
-              Profile
-            </NavLink>
-            <NavLink
-              to="/doctor/appointments"
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
-              activeClassName="text-medical-600 bg-medical-100"
-            >
-              <Calendar className="h-5 w-5" />
-              Appointments
-            </NavLink>
-            <NavLink
-              to="/doctor/patients"
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
-              activeClassName="text-medical-600 bg-medical-100"
-            >
-              <Users className="h-5 w-5" />
-              Patients
-            </NavLink>
-            <NavLink
-              to="/doctor/prescriptions"
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
-              activeClassName="text-medical-600 bg-medical-100"
-            >
-              <FileText className="h-5 w-5" />
-              Prescriptions
-            </NavLink>
-            <NavLink
-              to="/doctor/messages"
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-medical-50 rounded-lg transition-all"
-              activeClassName="text-medical-600 bg-medical-100"
-            >
-              <MessageSquare className="h-5 w-5" />
-              Messages
-            </NavLink>
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-8">
-          <Outlet />
-        </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
