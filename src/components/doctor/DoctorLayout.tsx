@@ -10,7 +10,8 @@ import {
   MessageSquare, 
   UserCircle,
   LogOut,
-  Stethoscope
+  Stethoscope,
+  Wallet
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { 
@@ -50,6 +51,7 @@ const DoctorLayout = () => {
     { to: '/doctor/patients', icon: Users, label: 'Patients' },
     { to: '/doctor/prescriptions', icon: FileText, label: 'Prescriptions' },
     { to: '/doctor/messages', icon: MessageSquare, label: 'Messages' },
+    { to: '/doctor/payment', icon: Wallet, label: 'Payment' },
   ];
 
   return (

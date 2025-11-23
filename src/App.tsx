@@ -24,6 +24,7 @@ import DoctorAppointments from "./pages/doctor/Appointments";
 import DoctorPatients from "./pages/doctor/Patients";
 import DoctorPrescriptions from "./pages/doctor/Prescriptions";
 import DoctorMessages from "./pages/doctor/Messages";
+import DoctorPayment from "./pages/doctor/Payment";
 import NotFound from "./pages/NotFound";
 import AppointmentDetail from "./pages/AppointmentDetail";
 import DoctorProfilePage from "./pages/DoctorProfile";
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="patients" element={<DoctorPatients />} />
               <Route path="prescriptions" element={<DoctorPrescriptions />} />
               <Route path="messages" element={<DoctorMessages />} />
+              <Route path="payment" element={<DoctorPayment />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
