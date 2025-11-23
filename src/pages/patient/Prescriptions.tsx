@@ -67,8 +67,7 @@ const PatientPrescriptions = () => {
   );
 
   const handleDownload = (prescription: Prescription) => {
-    const doctorName = doctorNames[prescription.doctor_id] || 'Unknown';
-    downloadPrescriptionPDF(prescription, doctorName, user?.name || 'Patient');
+    downloadPrescriptionPDF();
     toast({
       title: 'Download started',
       description: `Prescription PDF is being generated and downloaded...`,

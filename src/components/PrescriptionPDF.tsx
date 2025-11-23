@@ -1,6 +1,5 @@
 import { Prescription } from '@/types';
 import { format } from 'date-fns';
-import html2pdf from 'html2pdf.js';
 
 interface PrescriptionPDFProps {
   prescription: Prescription;
@@ -202,7 +201,7 @@ export const PrescriptionPDF = ({ prescription, doctorName, patientName }: Presc
           Medications
         </h2>
         
-        <div style={{ space: '24px' }}>
+        <div>
           {prescription.medications.map((med, index) => (
             <div 
               key={index} 
@@ -436,17 +435,7 @@ export const printPrescription = () => {
   }, 250);
 };
 
-export const downloadPrescriptionPDF = (prescription: Prescription, doctorName: string, patientName: string) => {
-  const element = document.getElementById('prescription-pdf');
-  if (!element) return;
-
-  const opt = {
-    margin: 10,
-    filename: `prescription-${doctorName.replace(/\s+/g, '-')}-${format(new Date(prescription.createdAt), 'yyyy-MM-dd')}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-  };
-
-  html2pdf().set(opt).from(element).save();
+export const downloadPrescriptionPDF = () => {
+  // Use browser's print dialog for PDF download
+  printPrescription();
 };
