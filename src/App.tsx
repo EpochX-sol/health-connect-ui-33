@@ -13,6 +13,7 @@ import PatientDashboard from "./pages/patient/Dashboard";
 import PatientProfile from "./pages/patient/Profile";
 import PatientAppointments from "./pages/patient/Appointments";
 import BookAppointment from "./pages/patient/BookAppointment";
+import PatientPayment from "./pages/patient/Payment";
 import PatientMessages from "./pages/patient/Messages";
 import PatientPrescriptions from "./pages/patient/Prescriptions";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -56,6 +57,7 @@ const App = () => (
               <Route path="appointment/:id" element={<AppointmentDetail />} />
               <Route path="doctor-profile/:id" element={<DoctorProfilePage />} />
               <Route path="book-appointment" element={<BookAppointment />} />
+              <Route path="payment" element={<PatientPayment />} />
               <Route path="messages" element={<PatientMessages />} />
               <Route path="prescriptions" element={<PatientPrescriptions />} />
             </Route>
