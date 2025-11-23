@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +12,12 @@ import { api } from '@/lib/api';
 import { Prescription } from '@/types';
 import { FileText, Download, Printer, Search, Pill, Calendar, User, Stethoscope, ClipboardList, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
-import { PrescriptionPDF, printPrescription } from '@/components/PrescriptionPDF';
+import { PrescriptionPDF, printPrescription, downloadPrescriptionPDF } from '@/components/PrescriptionPDF';
 
 const PatientPrescriptions = () => {
   const { token, user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,15 +67,11 @@ const PatientPrescriptions = () => {
   );
 
   const handleDownload = (prescription: Prescription) => {
-    const blob = new Blob([document.getElementById('prescription-pdf')?.innerHTML || ''], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `prescription-${prescription._id}.html`;
-    a.click();
+    const doctorName = doctorNames[prescription.doctor_id] || 'Unknown';
+    downloadPrescriptionPDF(prescription, doctorName, user?.name || 'Patient');
     toast({
       title: 'Download started',
-      description: 'Prescription is being downloaded...',
+      description: `Prescription PDF is being generated and downloaded...`,
     });
   };
 
@@ -81,7 +79,7 @@ const PatientPrescriptions = () => {
     setSelectedPrescription(prescription);
     setTimeout(() => {
       printPrescription();
-    }, 100);
+    }, 300);
   };
 
   return (
@@ -145,7 +143,12 @@ const PatientPrescriptions = () => {
                               <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Stethoscope className="h-3 w-3" />
-                                  Dr. {doctorNames[prescription.doctor_id] || 'Unknown Doctor'}
+                                  <Link 
+                                    to={`/patient/doctor-profile/${prescription.doctor_id}`}
+                                    className="hover:text-primary transition-colors hover:underline"
+                                  >
+                                    Dr. {doctorNames[prescription.doctor_id] || 'Unknown Doctor'}
+                                  </Link>
                                 </span>
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
@@ -224,102 +227,90 @@ const PatientPrescriptions = () => {
             onClick={() => setSelectedPrescription(null)}
             className="gap-2"
           >
-            ← Back to Prescriptions
+            <ArrowLeft className="h-4 w-4" />
+            Back to Prescriptions
           </Button>
 
-          <Card className="border-2">
+          <Card className="border-2 shadow-lg">
             <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="text-2xl mb-2">
-                    Prescription #{selectedPrescription._id.slice(-8)}
+                    Medical Prescription Document
                   </CardTitle>
                   <CardDescription className="flex flex-wrap gap-3 text-base">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       {format(new Date(selectedPrescription.createdAt), 'MMMM dd, yyyy')}
                     </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Stethoscope className="h-4 w-4" />
+                      Dr. {doctorNames[selectedPrescription.doctor_id] || 'Unknown'}
+                    </span>
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => handlePrint(selectedPrescription)} className="gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handlePrint(selectedPrescription)} 
+                    className="gap-2"
+                  >
                     <Printer className="h-4 w-4" />
                     Print
                   </Button>
-                  <Button onClick={() => handleDownload(selectedPrescription)} className="gap-2">
+                  <Button 
+                    onClick={() => handleDownload(selectedPrescription)} 
+                    className="gap-2"
+                  >
                     <Download className="h-4 w-4" />
-                    Download
+                    Download PDF
                   </Button>
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="pt-6 space-y-6">
-              {/* Doctor Info */}
-              <div>
-                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                  <Stethoscope className="h-5 w-5 text-primary" />
-                  Prescribed By
-                </h3>
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
-                  <div className="h-12 w-12 rounded-full bg-gradient-secondary flex items-center justify-center">
-                    <User className="h-6 w-6 text-secondary-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">Dr. {doctorNames[selectedPrescription.doctor_id] || selectedPrescription.doctor?.name || 'Unknown Doctor'}</p>
-                    <p className="text-sm text-muted-foreground">{selectedPrescription.doctor?.email}</p>
-                  </div>
-                </div>
+            <CardContent className="pt-6">
+              {/* Render the prescription PDF component */}
+              <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
+                <PrescriptionPDF 
+                  prescription={selectedPrescription}
+                  doctorName={doctorNames[selectedPrescription.doctor_id] || 'Doctor'}
+                  patientName={user?.name || 'Patient'}
+                />
               </div>
 
-              <Separator />
-
-              {/* Medications */}
-              <div>
-                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <Pill className="h-5 w-5 text-primary" />
-                  Medications
-                </h3>
-                <div className="space-y-4">
-                  {selectedPrescription.medications.map((medication, index) => (
-                    <Card key={index} className="border-2">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start gap-4">
-                          <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Pill className="h-6 w-6 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-semibold text-lg">{medication.name}</h4>
-                              <Badge>{medication.dosage}</Badge>
-                            </div>
-                            <div className="space-y-2">
-                              <div>
-                                <p className="text-sm font-medium text-muted-foreground">Dosage</p>
-                                <p className="text-sm">{medication.dosage}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-muted-foreground">Instructions</p>
-                                <p className="text-sm">{medication.instructions}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+              {/* Additional Details Section */}
+              <div className="mt-8 space-y-6">
+                <Separator />
+                
+                {/* Doctor Info */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                    <Stethoscope className="h-5 w-5 text-primary" />
+                    Prescribing Physician Details
+                  </h3>
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+                    <div className="h-12 w-12 rounded-full bg-gradient-secondary flex items-center justify-center">
+                      <User className="h-6 w-6 text-secondary-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Dr. {doctorNames[selectedPrescription.doctor_id] || selectedPrescription.doctor?.name || 'Unknown Doctor'}</p>
+                      <p className="text-sm text-muted-foreground">{selectedPrescription.doctor?.email}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Important Notice */}
-              <Card className="bg-warning/10 border-warning/50">
-                <CardContent className="pt-6">
-                  <p className="text-sm text-foreground">
-                    <strong>Important:</strong> Please follow the prescribed dosage and instructions carefully. 
-                    If you experience any adverse effects, contact your doctor immediately.
-                  </p>
-                </CardContent>
-              </Card>
+                {/* Important Notice */}
+                <Card className="bg-warning/10 border-warning/50">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-foreground">
+                      <strong>Important:</strong> Please follow the prescribed dosage and instructions carefully. 
+                      If you experience any adverse effects, contact your doctor immediately.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </CardContent>
           </Card>
         </div>

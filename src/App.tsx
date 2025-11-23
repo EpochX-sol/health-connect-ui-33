@@ -25,6 +25,8 @@ import DoctorPatients from "./pages/doctor/Patients";
 import DoctorPrescriptions from "./pages/doctor/Prescriptions";
 import DoctorMessages from "./pages/doctor/Messages";
 import NotFound from "./pages/NotFound";
+import AppointmentDetail from "./pages/AppointmentDetail";
+import DoctorProfilePage from "./pages/DoctorProfile";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +52,8 @@ const App = () => (
               <Route path="dashboard" element={<PatientDashboard />} />
               <Route path="profile" element={<PatientProfile />} />
               <Route path="appointments" element={<PatientAppointments />} />
+              <Route path="appointment/:id" element={<AppointmentDetail />} />
+              <Route path="doctor-profile/:id" element={<DoctorProfilePage />} />
               <Route path="book-appointment" element={<BookAppointment />} />
               <Route path="messages" element={<PatientMessages />} />
               <Route path="prescriptions" element={<PatientPrescriptions />} />
@@ -59,6 +63,7 @@ const App = () => (
               <Route path="dashboard" element={<DoctorDashboard />} />
               <Route path="profile" element={<DoctorProfile />} />
               <Route path="appointments" element={<DoctorAppointments />} />
+              <Route path="appointment/:id" element={<AppointmentDetail />} />
               <Route path="patients" element={<DoctorPatients />} />
               <Route path="prescriptions" element={<DoctorPrescriptions />} />
               <Route path="messages" element={<DoctorMessages />} />

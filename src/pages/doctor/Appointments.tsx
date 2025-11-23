@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Clock, User, Video, CheckCircle, X, FileText } from 'lucide-react';
+import { Calendar, Clock, Eye, Search, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import type { Appointment } from '@/types';
 
 const DoctorAppointments = () => {
@@ -17,22 +19,37 @@ const DoctorAppointments = () => {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [patientNames, setPatientNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetchAppointments();
-  }, [token]);
+    if (user && token) {
+      fetchAppointments();
+    }
+  }, [user, token]);
 
   const fetchAppointments = async () => {
-    if (!token) return;
+    if (!token || !user) return;
     
     try {
-      const data = await api.getAppointments(token);
+      const data = await api.getAppointmentsForDoctor(user._id, token);
       setAppointments(data);
+
+      // Fetch patient names
+      const patientIds = [...new Set(data.map((apt: Appointment) => apt.patient_id).filter(Boolean))] as string[];
+      const names: Record<string, string> = {};
+      await Promise.all(patientIds.map(async (id: string) => {
+        try {
+          const userData = await api.getUser(id, token);
+          names[id] = userData.name;
+        } catch {
+          names[id] = 'Unknown Patient';
+        }
+      }));
+      setPatientNames(names);
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to load appointments',
+        title: 'Failed to load appointments',
         variant: 'destructive',
       });
     } finally {
@@ -40,218 +57,129 @@ const DoctorAppointments = () => {
     }
   };
 
-  const handleCompleteAppointment = async (id: string) => {
-    if (!token) return;
-
-    try {
-      await api.updateAppointment(id, { status: 'completed' }, token);
-      toast({
-        title: 'Appointment Completed',
-        description: 'The appointment has been marked as completed.',
-      });
-      fetchAppointments();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to complete appointment',
-        variant: 'destructive',
-      });
-    }
+  const getPatientName = (apt: Appointment) => {
+    return patientNames[apt.patient_id || ''] || 'Unknown Patient';
   };
 
-  const getFilteredAppointments = () => {
-    const now = new Date();
-    
-    switch (filter) {
-      case 'upcoming':
-        return appointments.filter(
-          apt => apt.status === 'booked' && new Date(apt.scheduled_time) > now
-        );
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'booked':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'in-progress':
+        return 'bg-green-50 text-green-700 border-green-200';
       case 'completed':
-        return appointments.filter(apt => apt.status === 'completed');
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'cancelled':
-        return appointments.filter(apt => apt.status === 'cancelled');
+        return 'bg-red-50 text-red-700 border-red-200';
       default:
-        return appointments;
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
-  const filteredAppointments = getFilteredAppointments();
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: any; className: string }> = {
-      booked: { variant: 'default', className: 'bg-medical-100 text-medical-700 hover:bg-medical-200' },
-      completed: { variant: 'default', className: 'bg-success-100 text-success-700 hover:bg-success-200' },
-      cancelled: { variant: 'destructive', className: '' },
-      'in-progress': { variant: 'default', className: 'bg-accent-100 text-accent-700 hover:bg-accent-200' }
-    };
-    
-    const config = variants[status] || variants.booked;
-    return (
-      <Badge variant={config.variant as any} className={config.className}>
-        {status}
-      </Badge>
-    );
-  };
-
-  const isAppointmentToday = (date: string) => {
-    const aptDate = new Date(date);
-    const today = new Date();
-    return aptDate.toDateString() === today.toDateString();
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medical-600"></div>
-      </div>
-    );
-  }
+  const filteredAppointments = appointments.filter((apt) =>
+    getPatientName(apt).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    format(new Date(apt.scheduled_time), 'MMM dd, yyyy').includes(searchQuery)
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Appointments</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage and track your patient consultations
-          </p>
-        </div>
+    <div className="space-y-6 animate-fade-in">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Appointments</h1>
+        <p className="text-muted-foreground">Manage your appointments with patients</p>
       </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="w-full">
-        <TabsList className="grid w-full md:w-auto md:inline-grid grid-cols-4 gap-2">
-          <TabsTrigger value="all">
-            All ({appointments.length})
-          </TabsTrigger>
-          <TabsTrigger value="upcoming">
-            Upcoming ({appointments.filter(a => a.status === 'booked' && new Date(a.scheduled_time) > new Date()).length})
-          </TabsTrigger>
-          <TabsTrigger value="completed">
-            Completed ({appointments.filter(a => a.status === 'completed').length})
-          </TabsTrigger>
-          <TabsTrigger value="cancelled">
-            Cancelled ({appointments.filter(a => a.status === 'cancelled').length})
-          </TabsTrigger>
-        </TabsList>
+      {/* Search Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by patient name or date..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value={filter} className="mt-6 space-y-4">
-          {filteredAppointments.length === 0 ? (
-            <Card className="shadow-elegant">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Calendar className="h-16 w-16 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium text-foreground">No appointments found</p>
-                <p className="text-sm text-muted-foreground">
-                  {filter === 'all' 
-                    ? 'You have no appointments scheduled yet' 
-                    : `No ${filter} appointments`}
-                </p>
+      {/* Appointments List */}
+      {loading ? (
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
+                </div>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid gap-4">
-              {filteredAppointments.map((appointment) => (
-                <Card 
-                  key={appointment._id} 
-                  className={`shadow-elegant hover:shadow-glow transition-all ${
-                    isAppointmentToday(appointment.scheduled_time) && appointment.status === 'booked'
-                      ? 'border-medical-300 bg-medical-50/30'
-                      : ''
-                  }`}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className="p-3 bg-medical-100 rounded-lg">
-                          <User className="h-6 w-6 text-medical-600" />
-                        </div>
-                        
-                        <div className="flex-1 space-y-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-lg text-foreground">
-                                {appointment.patient?.name || 'Patient'}
-                              </h3>
-                              {isAppointmentToday(appointment.scheduled_time) && appointment.status === 'booked' && (
-                                <Badge className="bg-accent-100 text-accent-700">Today</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {appointment.patient?.email || 'No email'}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-4 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Calendar className="h-4 w-4" />
-                              {format(new Date(appointment.scheduled_time), 'MMMM dd, yyyy')}
-                            </div>
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Clock className="h-4 w-4" />
-                              {format(new Date(appointment.scheduled_time), 'h:mm a')}
-                            </div>
-                          </div>
-
-                          {appointment.notes && (
-                            <div className="p-3 bg-muted rounded-lg">
-                              <p className="text-sm text-foreground">
-                                <strong>Notes:</strong> {appointment.notes}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge(appointment.status)}
-                            {appointment.type && (
-                              <Badge variant="outline">{appointment.type}</Badge>
-                            )}
-                          </div>
-                        </div>
+          ))}
+        </div>
+      ) : filteredAppointments.length > 0 ? (
+        <div className="grid gap-4">
+          {filteredAppointments.map((appointment) => {
+            const patientName = patientNames[appointment.patient_id || ''] || 'Unknown Patient';
+            
+            return (
+              <Card
+                key={appointment._id}
+                className="hover:shadow-lg transition-all hover:border-primary/50"
+              >
+                <CardContent className="pt-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-lg truncate">
+                          {patientName}
+                        </h3>
+                        <Badge className={cn('px-2 py-1 text-xs', getStatusColor(appointment.status))}>
+                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                        </Badge>
                       </div>
-
-                      <div className="flex flex-col gap-2">
-                        {appointment.status === 'booked' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-2"
-                              onClick={() => handleCompleteAppointment(appointment._id)}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                              Complete
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-2"
-                              onClick={() => navigate('/doctor/prescriptions')}
-                            >
-                              <FileText className="h-4 w-4" />
-                              Prescribe
-                            </Button>
-                          </>
-                        )}
-                        {appointment.status === 'completed' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => navigate('/doctor/prescriptions')}
-                          >
-                            <FileText className="h-4 w-4" />
-                            View Records
-                          </Button>
-                        )}
+                      <Separator className="my-3" />
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {format(new Date(appointment.scheduled_time), 'MMM dd, yyyy')}
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          {format(new Date(appointment.scheduled_time), 'HH:mm')}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {appointment.type ? (appointment.type === 'video' ? '📹 Video Call' : '☎️ Audio Call') : 'Call'}
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <Button
+                      onClick={() => navigate(`/doctor/appointment/${appointment._id}`)}
+                      className="gap-2 md:w-auto w-full"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground mb-2">No appointments found</p>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery ? 'Try a different search' : 'You have no upcoming appointments'}
+              </p>
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

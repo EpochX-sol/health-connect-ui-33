@@ -13,11 +13,17 @@ import { CheckCircle, XCircle, Clock, User, Stethoscope, FileText, Shield } from
 import type { DoctorProfile } from '@/types';
 
 const DoctorProfilePage = () => {
-  const { user, token } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
   
   const [formData, setFormData] = useState({
     specialty: '',
@@ -68,6 +74,75 @@ const DoctorProfilePage = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: 'Passwords do not match',
+        description: 'Please ensure both password fields match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast({
+        title: 'Password too short',
+        description: 'Password must be at least 8 characters long.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.updateUser(user!._id, {
+        password: passwordData.newPassword,
+        currentPassword: passwordData.currentPassword,
+      }, token);
+
+      toast({
+        title: 'Password changed successfully',
+        description: 'Your password has been updated.',
+      });
+      
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (error) {
+      toast({
+        title: 'Failed to change password',
+        description: error instanceof Error ? error.message : 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.deleteUser(user!._id, token);
+      toast({
+        title: 'Account deleted',
+        description: 'Your account has been permanently deleted.',
+      });
+      window.location.href = '/login';
+    } catch (error) {
+      toast({
+        title: 'Failed to delete account',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -275,6 +350,94 @@ const DoctorProfilePage = () => {
           ) : (
             <p className="text-muted-foreground text-center py-8">No documents found</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Security Settings */}
+      <Card className="shadow-elegant">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-shield-100 rounded-lg">
+              <Shield className="h-5 w-5 text-shield-600" />
+            </div>
+            <div>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Manage your password and account security</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <form onSubmit={handlePasswordChange}>
+            <div className="space-y-4 mb-6">
+              <div>
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  placeholder="Enter current password"
+                  className="h-11 mt-2"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  disabled={changingPassword}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Enter new password (min 8 characters)"
+                  className="h-11 mt-2"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  disabled={changingPassword}
+                  required
+                  minLength={8}
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm new password"
+                  className="h-11 mt-2"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  disabled={changingPassword}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={changingPassword} className="gap-2">
+                <Shield className="w-4 h-4" />
+                {changingPassword ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-destructive/50 shadow-elegant">
+        <CardHeader>
+          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          <CardDescription>Irreversible actions for your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Once you delete your account, there is no going back. Please be certain.
+          </p>
+          <Button 
+            variant="destructive" 
+            className="gap-2"
+            onClick={handleDeleteAccount}
+          >
+            Delete Account
+          </Button>
         </CardContent>
       </Card>
     </div>

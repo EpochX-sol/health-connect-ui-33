@@ -45,21 +45,20 @@ const PatientLayout = () => {
 
   const menuItems = [
     { to: '/patient/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/patient/profile', icon: UserCircle, label: 'Profile' },
+    { to: '/patient/messages', icon: MessageSquare, label: 'Messages' },
     { to: '/patient/book-appointment', icon: Calendar, label: 'Book Appointment' },
     { to: '/patient/appointments', icon: Calendar, label: 'My Appointments' },
     { to: '/patient/prescriptions', icon: FileText, label: 'Prescriptions' },
-    { to: '/patient/messages', icon: MessageSquare, label: 'Messages' },
   ];
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen w-full flex">
+      <div className="min-h-screen w-full flex ">
         {/* Sidebar */}
         <Sidebar collapsible="icon">
           <SidebarContent>
             <SidebarGroup>
-              <div className="p-4 flex items-center gap-3 border-b border-sidebar-border">
+              <div className="p-4 flex items-center gap-3 border-b border-sidebar-border group-data-[collapsible=icon]:hidden">
                 <div className="p-2 rounded-lg bg-gradient-medical">
                   <Heart className="h-5 w-5 text-white" />
                 </div>
@@ -69,7 +68,7 @@ const PatientLayout = () => {
                 </div>
               </div>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className='mt-4'>
                   {menuItems.map((item) => (
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton asChild tooltip={item.label}>
@@ -93,7 +92,7 @@ const PatientLayout = () => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col bg-gradient-to-br from-background via-medical-50 to-medical-100">
           {/* Header */}
-          <header className="bg-background/80 backdrop-blur-lg border-b border-border shadow-elegant sticky top-0 z-40">
+          <header className="bg-background/80   border-b border-border  sticky top-0 z-40">
             <div className="px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SidebarTrigger />
@@ -102,14 +101,23 @@ const PatientLayout = () => {
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={handleLogout}
-                className="hover:bg-destructive/10 hover:text-destructive"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <NavLink
+                  to="/patient/profile"
+                  className="p-2 rounded-lg hover:bg-accent transition-colors"
+                  activeClassName="bg-accent"
+                >
+                  <UserCircle className="h-5 w-5" />
+                </NavLink>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={handleLogout}
+                  className="hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </header>
 

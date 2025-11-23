@@ -1,57 +1,50 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate, Link } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { getAuthData } from '@/lib/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Appointment } from '@/types';
-import { Calendar, Clock, Video, MapPin, Phone, Mail, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Eye, Search, AlertCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
-const Appointments = () => {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [cancelingId, setCancelingId] = useState<string | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
+const PatientAppointments = () => {
+  const { user, token } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
+
   useEffect(() => {
-    loadAppointments();
-  }, []);
+    if (user && token) {
+      loadAppointments();
+    }
+  }, [user, token]);
 
   const loadAppointments = async () => {
     try {
-      const authData = getAuthData();
-      if (!authData) {
-        navigate('/login');
-        return;
-      }
-      console.log('Patient ID:', authData.user);
-
-      const data = await api.getAppointmentsForPatient(authData.user._id);
+      if (!user) return;
+      const data = await api.getAppointmentsForPatient(user._id, token);
       setAppointments(data);
 
-      // Fetch doctor names by their IDs
-      const uniqueDoctorIds = Array.from(new Set(data.map((apt: Appointment) => typeof apt.doctor_id === 'string' ? apt.doctor_id : null).filter(Boolean))) as string[];
+      // Fetch doctor names
+      const doctorIds = [...new Set(data.map((apt: Appointment) => {
+        const id = typeof apt.doctor_id === 'string' ? apt.doctor_id : apt.doctor_id?._id;
+        return id;
+      }).filter(Boolean))] as string[];
+
       const names: Record<string, string> = {};
-      await Promise.all(uniqueDoctorIds.map(async (id: string) => {
+      await Promise.all(doctorIds.map(async (id: string) => {
         try {
-          const userData = await api.getUser(id);
+          const userData = await api.getUser(id, token);
           names[id] = userData.name;
         } catch {
           names[id] = 'Unknown Doctor';
@@ -61,7 +54,6 @@ const Appointments = () => {
     } catch (error) {
       toast({
         title: 'Failed to load appointments',
-        description: 'Please try again later.',
         variant: 'destructive',
       });
     } finally {
@@ -69,296 +61,155 @@ const Appointments = () => {
     }
   };
 
-  const handleCancelAppointment = async (id: string) => {
-    try {
-      const authData = getAuthData();
-      if (!authData) return;
-
-      await api.deleteAppointment(id);
-      toast({
-        title: 'Appointment cancelled',
-        description: 'Your appointment has been cancelled successfully.',
-      });
-      loadAppointments();
-    } catch (error) {
-      toast({
-        title: 'Failed to cancel appointment',
-        description: 'Please try again later.',
-        variant: 'destructive',
-      });
-    } finally {
-      setCancelingId(null);
-    }
+  const getDoctorName = (apt: Appointment) => {
+    const doctorId = typeof apt.doctor_id === 'string' ? apt.doctor_id : apt.doctor_id?._id;
+    return doctorNames[doctorId || ''] || 'Unknown Doctor';
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: any; icon: any }> = {
-      booked: { variant: 'default', icon: Clock },
-      completed: { variant: 'secondary', icon: CheckCircle2 },
-      cancelled: { variant: 'destructive', icon: X },
-      'in-progress': { variant: 'default', icon: Video },
-    };
-
-    const config = variants[status] || variants.booked;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="gap-1">
-        <Icon className="w-3 h-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
-  const filterAppointments = (appointments: Appointment[]) => {
-    const now = new Date();
-    
-    switch (selectedFilter) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
       case 'upcoming':
-        return appointments.filter(
-          (apt) => {
-            const aptTime = apt.dateTime || apt.scheduled_time;
-            return apt.status === 'booked' && new Date(aptTime) > now;
-          }
-        );
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'in-progress':
+        return 'bg-green-50 text-green-700 border-green-200';
       case 'completed':
-        return appointments.filter((apt) => apt.status === 'completed');
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'cancelled':
-        return appointments.filter((apt) => apt.status === 'cancelled');
+        return 'bg-red-50 text-red-700 border-red-200';
       default:
-        return appointments;
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
-  const filteredAppointments = filterAppointments(appointments);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const filteredAppointments = appointments.filter((apt) =>
+    getDoctorName(apt).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    format(new Date(apt.scheduled_time), 'MMM dd, yyyy').includes(searchQuery)
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">My Appointments</h1>
-          <p className="text-muted-foreground">Manage your upcoming and past appointments</p>
-        </div>
-        <Button onClick={() => navigate('/patient/appointments/book')} size="lg">
-          <Calendar className="w-5 h-5 mr-2" />
-          Book New Appointment
-        </Button>
+    <div className="space-y-6 animate-fade-in">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">My Appointments</h1>
+        <p className="text-muted-foreground">View and manage your appointments with doctors</p>
       </div>
 
-      <Tabs defaultValue="all" className="w-full" onValueChange={setSelectedFilter}>
-        <TabsList className="grid w-full max-w-md grid-cols-4">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="mt-6">
-          <AppointmentsList
-            appointments={filteredAppointments}
-            onCancel={setCancelingId}
-            getStatusBadge={getStatusBadge}
-            doctorNames={doctorNames}
-          />
-        </TabsContent>
-        <TabsContent value="upcoming" className="mt-6">
-          <AppointmentsList
-            appointments={filteredAppointments}
-            onCancel={setCancelingId}
-            getStatusBadge={getStatusBadge}
-            doctorNames={doctorNames}
-          />
-        </TabsContent>
-        <TabsContent value="completed" className="mt-6">
-          <AppointmentsList
-            appointments={filteredAppointments}
-            onCancel={setCancelingId}
-            getStatusBadge={getStatusBadge}
-            doctorNames={doctorNames}
-          />
-        </TabsContent>
-        <TabsContent value="cancelled" className="mt-6">
-          <AppointmentsList
-            appointments={filteredAppointments}
-            onCancel={setCancelingId}
-            getStatusBadge={getStatusBadge}
-            doctorNames={doctorNames}
-          />
-        </TabsContent>
-      </Tabs>
-
-      <AlertDialog open={!!cancelingId} onOpenChange={() => setCancelingId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Appointment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel this appointment? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No, Keep It</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => cancelingId && handleCancelAppointment(cancelingId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Yes, Cancel
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-};
-
-interface AppointmentsListProps {
-  appointments: Appointment[];
-  onCancel: (id: string) => void;
-  getStatusBadge: (status: string) => JSX.Element;
-  doctorNames: Record<string, string>;
-}
-
-const AppointmentsList = ({ appointments, onCancel, getStatusBadge, doctorNames }: AppointmentsListProps) => {
-  if (appointments.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No appointments found</h3>
-          <p className="text-muted-foreground text-center mb-4">
-            You don't have any appointments in this category yet.
-          </p>
+      {/* Search Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by doctor name or date..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </CardContent>
       </Card>
-    );
-  }
 
-  return (
-    <div className="grid gap-4">
-      {appointments.map((appointment) => {
-        const doctorId = typeof appointment.doctor_id === 'string' ? appointment.doctor_id : null;
-        const doctorName = doctorId ? doctorNames[doctorId] || 'Unknown Doctor' : 'Unknown Doctor';
-        const doctorData = typeof appointment.doctor_id === 'object' ? appointment.doctor_id : null;
-        const isVerified = doctorData?.isVerified || false;
-        const specialty = doctorData?.specialty || 'General Practice';
-        const appointmentTime = appointment.dateTime || appointment.scheduled_time;
-        const consultationType = appointment.type || 'video';
-        
-        return (
-          <Card key={appointment._id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    Dr. {doctorName}
-                    {isVerified && (
-                      <CheckCircle2 className="w-5 h-5 text-medical-success" />
-                    )}
-                  </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {specialty}
-                  </CardDescription>
+      {/* Appointments List */}
+      {loading ? (
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
                 </div>
-                {getStatusBadge(appointment.status)}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Date</p>
-                    <p className="text-muted-foreground">
-                      {format(new Date(appointmentTime), 'MMMM dd, yyyy')}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-secondary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Time</p>
-                    <p className="text-muted-foreground">
-                      {format(new Date(appointmentTime), 'h:mm a')}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="w-10 h-10 rounded-full bg-medical-accent/10 flex items-center justify-center">
-                    <Video className="w-5 h-5 text-medical-accent" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Consultation Type</p>
-                    <p className="text-muted-foreground capitalize">{consultationType}</p>
-                  </div>
-                </div>
-                {appointment.payment_id && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-10 h-10 rounded-full bg-medical-success/10 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-medical-success" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredAppointments.length > 0 ? (
+        <div className="grid gap-4">
+          {filteredAppointments.map((appointment) => {
+            const doctorId = typeof appointment.doctor_id === 'string' 
+              ? appointment.doctor_id 
+              : appointment.doctor_id?._id;
+            const doctorName = doctorNames[doctorId || ''] || 'Unknown Doctor';
+            
+            return (
+              <Card
+                key={appointment._id}
+                className="hover:shadow-lg transition-all hover:border-primary/50"
+              >
+                <CardContent className="pt-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-lg truncate">
+                          <Link 
+                            to={`/patient/doctor-profile/${doctorId}`}
+                            className="hover:text-primary transition-colors hover:underline"
+                          >
+                            Dr. {doctorName}
+                          </Link>
+                        </h3>
+                        <Badge className={cn('px-2 py-1 text-xs', getStatusColor(appointment.status))}>
+                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                        </Badge>
+                      </div>
+                      <Separator className="my-3" />
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {format(new Date(appointment.scheduled_time), 'MMM dd, yyyy')}
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          {format(new Date(appointment.scheduled_time), 'HH:mm')}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {appointment.type ? (appointment.type === 'video' ? '📹 Video Call' : '☎️ Audio Call') : 'Call'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Payment</p>
-                      <p className="text-muted-foreground">
-                        ETB {appointment.payment_id.amount}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
 
-              {appointment.notes && (
-                <div className="bg-muted/50 rounded-lg p-3 mb-4">
-                  <p className="text-sm font-medium mb-1">Notes:</p>
-                  <p className="text-sm text-muted-foreground">{appointment.notes}</p>
-                </div>
+                    <div className="flex gap-2 flex-col sm:flex-row">
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(`/patient/doctor-profile/${doctorId}`)}
+                        className="gap-2"
+                      >
+                        <User className="h-4 w-4" />
+                        <span className="hidden sm:inline">Doctor</span>
+                      </Button>
+                      <Button
+                        onClick={() => navigate(`/patient/appointment/${appointment._id}`)}
+                        className="gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground mb-2">No appointments found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {searchQuery ? 'Try a different search' : 'Book your first appointment with a doctor'}
+              </p>
+              {!searchQuery && (
+                <Button onClick={() => navigate('/patient/book-appointment')}>
+                  Book Appointment
+                </Button>
               )}
-
-              <div className="flex gap-2 flex-wrap">
-                {appointment.status === 'booked' && new Date(appointmentTime) > new Date() && (
-                  <>
-                    <Button variant="default" size="sm">
-                      <Video className="w-4 h-4 mr-2" />
-                      Join Call
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Phone className="w-4 h-4 mr-2" />
-                      Contact Doctor
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => onCancel(appointment._id)}
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </>
-                )}
-                {appointment.status === 'completed' && (
-                  <Button variant="outline" size="sm">
-                    <Mail className="w-4 h-4 mr-2" />
-                    View Prescription
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
 
-export default Appointments;
+export default PatientAppointments;

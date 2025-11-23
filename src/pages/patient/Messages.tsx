@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { Message, Appointment } from '@/types';
-import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video } from 'lucide-react';
+import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CallModal } from '@/components/CallModal';
@@ -18,43 +19,109 @@ import { CallModal } from '@/components/CallModal';
 const PatientMessages = () => {
   const { user, token } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
+  const [directMessageMode, setDirectMessageMode] = useState(false);
+  const [directMessages, setDirectMessages] = useState<Message[]>([]);
 
   useEffect(() => {
-    fetchData();
-  }, [token]);
-
-  useEffect(() => {
-    if (selectedAppointment) {
-      scrollToBottom();
+    if (!token || !user) return;
+    
+    // Check if coming from appointment detail page
+    const user1 = searchParams.get('user1');
+    const user2 = searchParams.get('user2');
+    
+    if (user1 && user2) {
+      // Load messages between two specific users
+      setDirectMessageMode(true);
+      setSelectedDoctorId(user2);
+      fetchMessagesBetweenUsers(user1, user2);
+      fetchOtherUserInfo(user2);
+    } else {
+      // Default behavior - load all messages
+      setDirectMessageMode(false);
+      fetchAppointmentsAndDoctors();
+      fetchMessagesByUser();
     }
-  }, [messages, selectedAppointment]);
+  }, [token, user, searchParams]);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const fetchAppointmentsAndDoctors = async () => {
     try {
-      const [appointmentsData, messagesData] = await Promise.all([
-        api.getAppointments(token!),
-        api.getMessages(token!)
-      ]);
+      const appointmentsData = await api.getAppointmentsForPatient(user._id, token);
       setAppointments(appointmentsData);
+      // Fetch doctor names
+      const doctorIds = [...new Set(appointmentsData.map(a => a.doctor_id).filter(Boolean))];
+      const names: Record<string, string> = {};
+      await Promise.all(doctorIds.map(async (id: string) => {
+        try {
+          const userData = await api.getUser(id, token);
+          names[id] = userData.name;
+        } catch {
+          names[id] = 'Unknown Doctor';
+        }
+      }));
+      setDoctorNames(names);
+    } catch (error) {
+      toast({
+        title: 'Failed to load appointments',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMessagesByUser = async () => {
+    if (!token || !user) return;
+    try {
+      const messagesData = await api.getMessagesByUser(user._id, token);
+      console.log('Fetched messages:', messagesData);
       setMessages(messagesData);
     } catch (error) {
       toast({
         title: 'Failed to load messages',
         variant: 'destructive',
       });
-    } finally {
+    }
+  };
+
+  const fetchMessagesBetweenUsers = async (user1Id: string, user2Id: string) => {
+    if (!token) return;
+    try {
+      const messagesData = await api.getMessagesBetweenUsers(user1Id, user2Id, token);
+      setDirectMessages(messagesData || []);
       setLoading(false);
+    } catch (error) {
+      console.error('Error fetching messages between users:', error);
+      setDirectMessages([]);
+      setLoading(false);
+    }
+  };
+
+  const fetchOtherUserInfo = async (userId: string) => {
+    if (!token) return;
+    try {
+      const userData = await api.getUser(userId, token);
+      setDoctorNames(prev => ({ ...prev, [userId]: userData.name }));
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      setDoctorNames(prev => ({ ...prev, [userId]: 'Unknown User' }));
     }
   };
 
@@ -65,25 +132,22 @@ const PatientMessages = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !selectedAppointment) return;
-
+    if (!messageText.trim() || !selectedDoctorId || !user) return;
     setSending(true);
     try {
-      const doctorId = typeof selectedAppointment.doctor_id === 'string' 
-        ? selectedAppointment.doctor_id 
-        : selectedAppointment.doctor_id._id;
-      
       const newMessage = await api.sendMessage(
         {
-          sender_id: user!._id,
-          receiver_id: doctorId,
-          appointment_id: selectedAppointment._id,
+          sender_id: user._id,
+          receiver_id: selectedDoctorId,
           content: messageText,
         },
-        token!
+        token
       );
-      
-      setMessages([...messages, newMessage]);
+      if (directMessageMode) {
+        setDirectMessages([...directMessages, newMessage]);
+      } else {
+        setMessages([...messages, newMessage]);
+      }
       setMessageText('');
     } catch (error) {
       toast({
@@ -94,34 +158,34 @@ const PatientMessages = () => {
       setSending(false);
     }
   };
-
-  const getAppointmentMessages = () => {
-    if (!selectedAppointment) return [];
-    return messages.filter((msg) => msg.appointment_id === selectedAppointment._id);
-  };
-
-  const getLastMessage = (appointmentId: string) => {
-    const msgs = messages.filter((msg) => msg.appointment_id === appointmentId);
-    return msgs[msgs.length - 1];
-  };
-
-  const filteredAppointments = appointments.filter((apt) =>
-    apt.doctor?.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+ 
+  const doctorIds = [...new Set(messages.map(m => m.receiver_id === user?._id ? m.sender_id : m.receiver_id))];
+   
+  const sortedDoctorIds = doctorIds.sort((id1, id2) => {
+    const messages1 = messages.filter(m => (m.receiver_id === id1 || m.sender_id === id1));
+    const messages2 = messages.filter(m => (m.receiver_id === id2 || m.sender_id === id2));
+    
+    const lastMessage1 = messages1[messages1.length - 1];
+    const lastMessage2 = messages2[messages2.length - 1];
+    
+    const time1 = lastMessage1 ? new Date(lastMessage1.timestamp).getTime() : 0;
+    const time2 = lastMessage2 ? new Date(lastMessage2.timestamp).getTime() : 0;
+    
+    return time2 - time1; // Latest first
+  });
+  
+  const filteredDoctorIds = sortedDoctorIds.filter(id => doctorNames[id]?.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const getInitials = (name: string) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Messages</h1>
-        <p className="text-muted-foreground">Communicate with your doctors</p>
-      </div>
+    <div className="space-y-6 animate-fade-in"> 
 
-      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
+      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-150px)]">
         {/* Conversations List */}
+        {!directMessageMode ? (
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Conversations</CardTitle>
@@ -145,16 +209,18 @@ const PatientMessages = () => {
                   </div>
                 ))}
               </div>
-            ) : filteredAppointments.length > 0 ? (
+            ) : filteredDoctorIds.length > 0 ? (
               <div className="p-2">
-                {filteredAppointments.map((appointment) => {
-                  const lastMessage = getLastMessage(appointment._id);
-                  const isSelected = selectedAppointment?._id === appointment._id;
+                {filteredDoctorIds.map((doctorId) => {
+                  const doctorName = doctorNames[doctorId] || 'Unknown Doctor';
+                  const doctorMessages = messages.filter(m => (m.receiver_id === doctorId || m.sender_id === doctorId));
+                  const lastMessage = doctorMessages[doctorMessages.length - 1];
+                  const isSelected = selectedDoctorId === doctorId;
                   
                   return (
                     <button
-                      key={appointment._id}
-                      onClick={() => setSelectedAppointment(appointment)}
+                      key={doctorId}
+                      onClick={() => setSelectedDoctorId(doctorId)}
                       className={cn(
                         "w-full p-3 rounded-lg text-left transition-all hover:bg-accent/50 mb-2",
                         isSelected && "bg-primary/10 border-2 border-primary/50"
@@ -163,13 +229,13 @@ const PatientMessages = () => {
                       <div className="flex gap-3">
                         <Avatar className="h-12 w-12 border-2 border-background">
                           <AvatarFallback className="bg-gradient-secondary text-secondary-foreground">
-                            {getInitials(appointment.doctor?.name || 'D')}
+                            {getInitials(doctorName)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <p className="font-semibold text-sm truncate">
-                              Dr. {appointment.doctor?.name}
+                              Dr. {doctorName}
                             </p>
                             {lastMessage && (
                               <span className="text-xs text-muted-foreground">
@@ -189,38 +255,46 @@ const PatientMessages = () => {
             ) : (
               <div className="text-center py-12 px-4">
                 <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">No appointments found</p>
+                <p className="text-sm text-muted-foreground">No conversations found</p>
               </div>
             )}
           </ScrollArea>
         </Card>
+        ) : null}
 
-        {/* Chat Area */}
-        <Card className="lg:col-span-2 flex flex-col">
-          {selectedAppointment ? (
+        {/* Chat Area by Doctor */}
+        <Card className={cn("flex flex-col", directMessageMode ? "lg:col-span-3" : "lg:col-span-2")}>
+          {selectedDoctorId ? (
             <>
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12 border-2 border-background">
                       <AvatarFallback className="bg-gradient-secondary text-secondary-foreground">
-                        {getInitials(selectedAppointment.doctor?.name || 'D')}
+                        {getInitials(doctorNames[selectedDoctorId] || 'D')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <CardTitle className="text-lg">
-                        Dr. {selectedAppointment.doctor?.name}
+                        <Link 
+                          to={`/patient/doctor-profile/${selectedDoctorId}`}
+                          className="hover:text-primary transition-colors hover:underline"
+                        >
+                          Dr. {doctorNames[selectedDoctorId] || 'Unknown Doctor'}
+                        </Link>
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Stethoscope className="h-3 w-3" />
-                        {selectedAppointment.doctorProfile?.specialty || 'Doctor'}
-                      </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Badge variant="secondary">
-                      {format(new Date(selectedAppointment.scheduled_time), 'MMM dd, yyyy')}
-                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => navigate(`/patient/doctor-profile/${selectedDoctorId}`)}
+                      title="View doctor profile"
+                      className="hover:bg-secondary hover:text-secondary-foreground"
+                    >
+                      <User className="h-5 w-5" />
+                    </Button>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -249,8 +323,8 @@ const PatientMessages = () => {
 
               <ScrollArea className="flex-1 p-4" ref={scrollRef}>
                 <div className="space-y-4">
-                  {getAppointmentMessages().length > 0 ? (
-                    getAppointmentMessages().map((message) => {
+                  {(directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedDoctorId || m.sender_id === selectedDoctorId))).length > 0 ? (
+                    (directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedDoctorId || m.sender_id === selectedDoctorId))).map((message) => {
                       const isOwn = message.sender_id === user?._id;
                       return (
                         <div
@@ -337,7 +411,7 @@ const PatientMessages = () => {
                 </div>
                 <p className="text-muted-foreground mb-2">Select a conversation</p>
                 <p className="text-sm text-muted-foreground">
-                  Choose an appointment to start messaging
+                  Choose a doctor to start messaging
                 </p>
               </div>
             </CardContent>
@@ -349,9 +423,9 @@ const PatientMessages = () => {
         isOpen={isCallOpen}
         onClose={() => setIsCallOpen(false)}
         isVideoCall={callType === 'video'}
-        participantName={selectedAppointment?.doctor?.name || 'Doctor'}
-        participantInitials={selectedAppointment?.doctor?.name 
-          ? getInitials(selectedAppointment.doctor.name) 
+        participantName={doctorNames[selectedDoctorId || ''] || 'Doctor'}
+        participantInitials={selectedDoctorId
+          ? getInitials(doctorNames[selectedDoctorId] || 'D')
           : 'D'}
       />
     </div>

@@ -18,10 +18,37 @@ const PatientProfile = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  const [loadingPrescriptions, setLoadingPrescriptions] = useState(true);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
   });
+
+  useEffect(() => {
+    if (user?._id && token) {
+      fetchPrescriptions();
+    }
+  }, [user?._id, token]);
+
+  const fetchPrescriptions = async () => {
+    try {
+      setLoadingPrescriptions(true);
+      const data = await api.getAllPrescriptions(token, user!._id);
+      setPrescriptions(data || []);
+    } catch (error) {
+      console.error('Error fetching prescriptions:', error);
+      setPrescriptions([]);
+    } finally {
+      setLoadingPrescriptions(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +69,77 @@ const PatientProfile = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: 'Passwords do not match',
+        description: 'Please ensure both password fields match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast({
+        title: 'Password too short',
+        description: 'Password must be at least 8 characters long.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      // Call API to change password
+      await api.updateUser(user!._id, {
+        password: passwordData.newPassword,
+        currentPassword: passwordData.currentPassword,
+      }, token);
+
+      toast({
+        title: 'Password changed successfully',
+        description: 'Your password has been updated.',
+      });
+      
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (error) {
+      toast({
+        title: 'Failed to change password',
+        description: error instanceof Error ? error.message : 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.deleteUser(user!._id, token);
+      toast({
+        title: 'Account deleted',
+        description: 'Your account has been permanently deleted.',
+      });
+      // Redirect to login or home
+      window.location.href = '/login';
+    } catch (error) {
+      toast({
+        title: 'Failed to delete account',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -218,19 +316,60 @@ const PatientProfile = () => {
             <CardHeader>
               <CardTitle>Medical History</CardTitle>
               <CardDescription>
-                Your health records and medical information
+                Your prescriptions and medical records
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <div className="h-20 w-20 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
-                  <Activity className="w-10 h-10 text-muted-foreground" />
+              {loadingPrescriptions ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-24 bg-muted rounded-lg animate-pulse"></div>
+                  ))}
                 </div>
-                <p className="text-muted-foreground mb-2">No medical history available</p>
-                <p className="text-sm text-muted-foreground">
-                  Your medical records will appear here after consultations
-                </p>
-              </div>
+              ) : prescriptions.length > 0 ? (
+                <div className="space-y-4">
+                  {prescriptions.map((prescription: any) => (
+                    <div key={prescription._id} className="p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-semibold text-foreground">Prescription ID: {prescription._id.slice(-8)}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(prescription.createdAt), 'MMMM dd, yyyy')}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Active</Badge>
+                      </div>
+                      <Separator className="my-3" />
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Medications:</h4>
+                        {prescription.medications && Array.isArray(prescription.medications) ? (
+                          <ul className="space-y-2">
+                            {prescription.medications.map((med: any, idx: number) => (
+                              <li key={idx} className="text-sm text-muted-foreground pl-4 border-l-2 border-primary/30">
+                                <span className="font-medium text-foreground">{med.name}</span>
+                                {med.dosage && <span> - {med.dosage}</span>}
+                                {med.instructions && <span className="text-xs block mt-1">Instructions: {med.instructions}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No medications specified</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="h-20 w-20 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                    <Activity className="w-10 h-10 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground mb-2">No prescriptions yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    Your prescriptions will appear here after consultations
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -244,44 +383,59 @@ const PatientProfile = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    placeholder="Enter current password"
-                    className="h-11 mt-2"
-                  />
+              <form onSubmit={handlePasswordChange}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      placeholder="Enter current password"
+                      className="h-11 mt-2"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                      disabled={changingPassword}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="Enter new password (min 8 characters)"
+                      className="h-11 mt-2"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      disabled={changingPassword}
+                      required
+                      minLength={8}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      placeholder="Confirm new password"
+                      className="h-11 mt-2"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      disabled={changingPassword}
+                      required
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Enter new password"
-                    className="h-11 mt-2"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Confirm new password"
-                    className="h-11 mt-2"
-                  />
-                </div>
-              </div>
 
-              <Separator />
+                <Separator className="my-6" />
 
-              <div className="flex justify-end">
-                <Button className="gap-2">
-                  <Save className="w-4 h-4" />
-                  Update Password
-                </Button>
-              </div>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={changingPassword} className="gap-2">
+                    <Save className="w-4 h-4" />
+                    {changingPassword ? 'Updating...' : 'Update Password'}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
 
@@ -293,7 +447,14 @@ const PatientProfile = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="destructive" className="gap-2">
+              <p className="text-sm text-muted-foreground mb-4">
+                Once you delete your account, there is no going back. Please be certain.
+              </p>
+              <Button 
+                variant="destructive" 
+                className="gap-2"
+                onClick={handleDeleteAccount}
+              >
                 Delete Account
               </Button>
             </CardContent>

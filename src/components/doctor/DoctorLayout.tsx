@@ -46,7 +46,6 @@ const DoctorLayout = () => {
 
   const menuItems = [
     { to: '/doctor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/doctor/profile', icon: UserCircle, label: 'Profile' },
     { to: '/doctor/appointments', icon: Calendar, label: 'Appointments' },
     { to: '/doctor/patients', icon: Users, label: 'Patients' },
     { to: '/doctor/prescriptions', icon: FileText, label: 'Prescriptions' },
@@ -103,14 +102,23 @@ const DoctorLayout = () => {
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={handleLogout}
-                className="hover:bg-destructive/10 hover:text-destructive"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <NavLink
+                  to="/doctor/profile"
+                  className="p-2 rounded-lg hover:bg-accent transition-colors"
+                  activeClassName="bg-accent"
+                >
+                  <UserCircle className="h-5 w-5" />
+                </NavLink>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={handleLogout}
+                  className="hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </header>
 

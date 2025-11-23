@@ -26,6 +26,7 @@ const PatientDashboard = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -50,6 +51,24 @@ const PatientDashboard = () => {
 
       setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
       setPrescriptions(Array.isArray(prescriptionsData) ? prescriptionsData : []);
+
+      // Fetch doctor names for all appointments
+      const appointmentList = Array.isArray(appointmentsData) ? appointmentsData : [];
+      const doctorIds = [...new Set(appointmentList.map((apt: Appointment) => {
+        return typeof apt.doctor_id === 'string' ? apt.doctor_id : apt.doctor_id?._id;
+      }).filter(Boolean))] as string[];
+      
+      if (doctorIds.length > 0) {
+        const doctorPromises = doctorIds.map(doctorId => 
+          api.getUser(String(doctorId), token!)
+        );
+        const doctorResults = await Promise.all(doctorPromises);
+        const names: Record<string, string> = {};
+        doctorResults.forEach((doc) => {
+          names[doc._id] = doc.name;
+        });
+        setDoctorNames(names);
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast({
@@ -95,13 +114,10 @@ const PatientDashboard = () => {
   };
 
   const getDoctorName = (appointment: Appointment) => {
-    return appointment.doctor?.name || 
-           appointment.doctorProfile?.user?.name || 
-           'Doctor';
-  };
-
-  const getDoctorSpecialty = (appointment: Appointment) => {
-    return appointment.doctorProfile?.specialty || 'General Practice';
+    const doctorId = typeof appointment.doctor_id === 'string' 
+      ? appointment.doctor_id 
+      : appointment.doctor_id?._id;
+    return doctorNames[doctorId || ''] || 'Doctor';
   };
 
   if (loading) {
@@ -174,7 +190,7 @@ const PatientDashboard = () => {
           </CardContent>
         </Card>
 
-        <Link to="/patient/appointments/book" className="block group">
+        <Link to="/patient/book-appointment" className="block group">
           <Card className="h-full border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1 cursor-pointer">
             <CardHeader className="pb-3">
               <CardDescription className="group-hover:text-primary transition-colors">Quick Action</CardDescription>
@@ -208,19 +224,27 @@ const PatientDashboard = () => {
                 </div>
                 <div>
                   <p className="font-semibold text-lg text-foreground">Dr. {getDoctorName(nextAppointment)}</p>
-                  <p className="text-sm text-muted-foreground">{getDoctorSpecialty(nextAppointment)}</p>
+                  <p className="text-sm text-muted-foreground">Licensed Medical Professional</p>
                   <p className="text-sm font-medium text-foreground mt-1 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {format(new Date(nextAppointment.scheduled_time), 'PPp')}
                   </p>
                 </div>
               </div>
-              <Button size="lg" className="gap-2" asChild>
-                <Link to={`/patient/appointments/${nextAppointment._id}`}>
-                  <Video className="h-4 w-4" />
-                  Join
-                </Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button size="lg" className="gap-2" asChild>
+                  <Link to={`/patient/appointment/${nextAppointment._id}`}>
+                    <Video className="h-4 w-4" />
+                    View Details
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="gap-2" asChild>
+                  <Link to={`/patient/doctor-profile/${typeof nextAppointment.doctor_id === 'string' ? nextAppointment.doctor_id : nextAppointment.doctor_id?._id}`}>
+                    <Stethoscope className="h-4 w-4" />
+                    Doctor Profile
+                  </Link>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -252,8 +276,15 @@ const PatientDashboard = () => {
                         <Stethoscope className="h-6 w-6 text-secondary-foreground" />
                       </div>
                       <div>
-                        <p className="font-semibold text-foreground">Dr. {getDoctorName(appointment)}</p>
-                        <p className="text-xs text-muted-foreground">{getDoctorSpecialty(appointment)}</p>
+                        <p className="font-semibold text-foreground">
+                          <Link 
+                            to={`/patient/doctor-profile/${typeof appointment.doctor_id === 'string' ? appointment.doctor_id : appointment.doctor_id?._id}`}
+                            className="hover:text-primary transition-colors"
+                          >
+                            Dr. {getDoctorName(appointment)}
+                          </Link>
+                        </p>
+                        <p className="text-xs text-muted-foreground">Medical Consultation</p>
                         <p className="text-sm text-foreground mt-1 flex items-center gap-1 font-medium">
                           <Clock className="w-3 h-3 text-primary" />
                           {format(new Date(appointment.scheduled_time), 'PPp')}
@@ -263,7 +294,7 @@ const PatientDashboard = () => {
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="capitalize">{appointment.status}</Badge>
                       <Button size="sm" variant="ghost" asChild>
-                        <Link to={`/patient/appointments/${appointment._id}`}>View</Link>
+                        <Link to={`/patient/appointment/${appointment._id}`}>View</Link>
                       </Button>
                     </div>
                   </div>
@@ -294,7 +325,7 @@ const PatientDashboard = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button className="w-full justify-start gap-3 h-auto py-3" variant="outline" asChild>
-                <Link to="/patient/appointments/book">
+                <Link to="/patient/book-appointment">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Plus className="w-4 h-4 text-primary" />
                   </div>

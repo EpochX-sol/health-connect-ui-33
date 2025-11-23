@@ -1,6 +1,15 @@
-const API_BASE_URL = 'https://proj-babi.onrender.com/api';
+const API_BASE_URL = 'http://localhost:8001/api';
 
 export const api = {
+    getMessagesByUser: async (userId: string, token?: string) => {
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch(`${API_BASE_URL}/messages/user/${userId}`, { headers });
+      if (!response.ok) throw new Error('Failed to fetch messages by user');
+      const result = await response.json();
+      console.log('getMessagesByUser:', result);
+      return result;
+    },
   register: async (data: { name: string; email: string; password: string; role: string }) => {
     const response = await fetch(`${API_BASE_URL}/users/register`, {
       method: 'POST',
@@ -256,6 +265,62 @@ export const api = {
     if (!response.ok) throw new Error('Failed to delete appointment');
     const result = await response.json();
     console.log('deleteAppointment:', result);
+    return result;
+  },
+
+  cancelAppointment: async (id: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}/cancel`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status: 'cancelled' }),
+    });
+    if (!response.ok) throw new Error('Failed to cancel appointment');
+    const result = await response.json();
+    console.log('cancelAppointment:', result);
+    return result;
+  },
+
+  completeAppointment: async (id: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}/complete`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status: 'completed' }),
+    });
+    if (!response.ok) throw new Error('Failed to complete appointment');
+    const result = await response.json();
+    console.log('completeAppointment:', result);
+    return result;
+  },
+
+  updateAppointmentNotes: async (id: string, notes: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ notes }),
+    });
+    if (!response.ok) throw new Error('Failed to update notes');
+    const result = await response.json();
+    console.log('updateAppointmentNotes:', result);
+    return result;
+  },
+
+  getPrescriptionsByAppointment: async (appointmentId: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/prescriptions/appointment/${appointmentId}`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch prescriptions');
+    const result = await response.json();
+    console.log('getPrescriptionsByAppointment:', result);
     return result;
   },
 

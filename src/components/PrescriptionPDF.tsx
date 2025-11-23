@@ -1,5 +1,6 @@
 import { Prescription } from '@/types';
 import { format } from 'date-fns';
+import html2pdf from 'html2pdf.js';
 
 interface PrescriptionPDFProps {
   prescription: Prescription;
@@ -9,106 +10,375 @@ interface PrescriptionPDFProps {
 
 export const PrescriptionPDF = ({ prescription, doctorName, patientName }: PrescriptionPDFProps) => {
   return (
-    <div id="prescription-pdf" className="prescription-paper max-w-4xl mx-auto bg-white p-12 shadow-2xl">
-      {/* Header */}
-      <div className="border-b-4 border-medical-600 pb-6 mb-8">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-medical-800">Medical Prescription</h1>
-            <p className="text-sm text-muted-foreground mt-2">Telehealth Platform</p>
+    <div 
+      id="prescription-pdf" 
+      style={{
+        padding: '48px',
+        backgroundColor: 'white',
+        fontFamily: 'Arial, sans-serif',
+        color: '#333',
+        maxWidth: '900px',
+        margin: '0 auto',
+        boxShadow: '0 25px 50px rgba(0,0,0,0.15)'
+      }}
+    >
+      {/* Header with Medical Theme */}
+      <div 
+        style={{
+          borderBottom: '4px solid #0066cc',
+          paddingBottom: '24px',
+          marginBottom: '32px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}
+      >
+        <div>
+          <h1 style={{
+            fontSize: '32px',
+            fontWeight: 'bold',
+            color: '#003d99',
+            margin: 0,
+            marginBottom: '8px'
+          }}>
+            Medical Prescription
+          </h1>
+          <p style={{
+            fontSize: '13px',
+            color: '#666',
+            margin: 0,
+            marginTop: '8px'
+          }}>
+            Digital Healthcare Platform
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            margin: 0,
+            color: '#333'
+          }}>
+            Prescription ID
+          </p>
+          <p style={{
+            fontSize: '12px',
+            color: '#666',
+            fontFamily: 'monospace',
+            margin: '4px 0'
+          }}>
+            #{prescription._id.slice(-8).toUpperCase()}
+          </p>
+          <p style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            margin: '16px 0 4px 0',
+            color: '#333'
+          }}>
+            Date
+          </p>
+          <p style={{
+            fontSize: '12px',
+            color: '#666',
+            margin: 0
+          }}>
+            {format(new Date(prescription.createdAt), 'MMMM dd, yyyy')}
+          </p>
+        </div>
+      </div>
+
+      {/* Doctor and Patient Info Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '32px',
+        marginBottom: '32px'
+      }}>
+        <div>
+          <h3 style={{
+            fontSize: '12px',
+            fontWeight: 'bold',
+            color: '#003d99',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            margin: 0,
+            marginBottom: '12px'
+          }}>
+            Prescribing Physician
+          </h3>
+          <div style={{
+            backgroundColor: '#f0f4ff',
+            padding: '16px',
+            borderRadius: '8px',
+            border: '1px solid #d9e4ff'
+          }}>
+            <p style={{
+              fontWeight: '600',
+              fontSize: '18px',
+              margin: 0,
+              color: '#003d99'
+            }}>
+              Dr. {doctorName}
+            </p>
+            <p style={{
+              fontSize: '13px',
+              color: '#666',
+              margin: '4px 0 0 0'
+            }}>
+              Licensed Medical Professional
+            </p>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-semibold">Prescription ID</p>
-            <p className="text-xs text-muted-foreground font-mono">#{prescription._id.slice(-8).toUpperCase()}</p>
-            <p className="text-sm font-semibold mt-2">Date</p>
-            <p className="text-xs text-muted-foreground">{format(new Date(prescription.createdAt), 'MMMM dd, yyyy')}</p>
+        </div>
+        <div>
+          <h3 style={{
+            fontSize: '12px',
+            fontWeight: 'bold',
+            color: '#003d99',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            margin: 0,
+            marginBottom: '12px'
+          }}>
+            Patient Information
+          </h3>
+          <div style={{
+            backgroundColor: '#f5f5f5',
+            padding: '16px',
+            borderRadius: '8px',
+            border: '1px solid #e0e0e0'
+          }}>
+            <p style={{
+              fontWeight: '600',
+              fontSize: '18px',
+              margin: 0,
+              color: '#333'
+            }}>
+              {patientName}
+            </p>
+            <p style={{
+              fontSize: '13px',
+              color: '#666',
+              margin: '4px 0 0 0'
+            }}>
+              Patient ID: {prescription.patient_id.slice(-8).toUpperCase()}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Doctor and Patient Info */}
-      <div className="grid grid-cols-2 gap-8 mb-8">
-        <div className="space-y-2">
-          <h3 className="text-sm font-bold text-medical-700 uppercase tracking-wide">Prescribing Physician</h3>
-          <div className="bg-medical-50 p-4 rounded-lg">
-            <p className="font-semibold text-lg">Dr. {doctorName}</p>
-            <p className="text-sm text-muted-foreground">Licensed Medical Professional</p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-sm font-bold text-medical-700 uppercase tracking-wide">Patient</h3>
-          <div className="bg-accent-50 p-4 rounded-lg">
-            <p className="font-semibold text-lg">{patientName}</p>
-            <p className="text-sm text-muted-foreground">Patient ID: {prescription.patient_id.slice(-8).toUpperCase()}</p>
-          </div>
-        </div>
+      {/* Rx Symbol Divider */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '24px'
+      }}>
+        <span style={{
+          fontSize: '48px',
+          fontFamily: 'Georgia, serif',
+          color: '#0066cc',
+          lineHeight: 1
+        }}>
+          ℞
+        </span>
+        <div style={{
+          flex: 1,
+          borderTop: '2px solid #ccc'
+        }}></div>
       </div>
 
-      {/* Rx Symbol */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <span className="text-6xl font-serif text-medical-600">℞</span>
-          <div className="flex-1 border-t-2 border-medical-200"></div>
-        </div>
-      </div>
-
-      {/* Medications */}
-      <div className="space-y-6 mb-12">
-        {prescription.medications.map((med, index) => (
-          <div key={index} className="border-l-4 border-medical-600 pl-6 py-3 bg-gray-50 rounded-r">
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-3">
-                <span className="font-semibold text-xl text-foreground">{index + 1}.</span>
-                <div className="flex-1">
-                  <h4 className="font-bold text-xl text-medical-800">{med.name}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    <span className="font-semibold">Dosage:</span> {med.dosage}
+      {/* Medications Section */}
+      <div style={{ marginBottom: '48px' }}>
+        <h2 style={{
+          fontSize: '14px',
+          fontWeight: 'bold',
+          color: '#003d99',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          borderBottom: '2px solid #0066cc',
+          paddingBottom: '12px',
+          marginBottom: '24px'
+        }}>
+          Medications
+        </h2>
+        
+        <div style={{ space: '24px' }}>
+          {prescription.medications.map((med, index) => (
+            <div 
+              key={index} 
+              style={{
+                borderLeft: '4px solid #0066cc',
+                paddingLeft: '20px',
+                paddingTop: '12px',
+                paddingBottom: '12px',
+                marginBottom: '20px',
+                backgroundColor: '#fafafa',
+                paddingRight: '16px',
+                borderRadius: '0 4px 4px 0'
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: '16px',
+                marginBottom: '12px'
+              }}>
+                <span style={{
+                  fontWeight: '600',
+                  fontSize: '18px',
+                  color: '#333'
+                }}>
+                  {index + 1}.
+                </span>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{
+                    fontWeight: '700',
+                    fontSize: '16px',
+                    color: '#003d99',
+                    margin: 0,
+                    marginBottom: '4px'
+                  }}>
+                    {med.name}
+                  </h4>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#666',
+                    margin: 0
+                  }}>
+                    <span style={{ fontWeight: '600' }}>Strength:</span> {med.dosage}
                   </p>
                 </div>
               </div>
-              <div className="ml-8 mt-2 bg-white p-3 rounded border border-medical-200">
-                <p className="text-sm">
-                  <span className="font-semibold text-medical-700">Instructions:</span>{' '}
-                  <span className="text-foreground">{med.instructions}</span>
+              <div style={{
+                marginLeft: '32px',
+                marginTop: '12px',
+                backgroundColor: 'white',
+                padding: '12px',
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}>
+                <p style={{
+                  fontSize: '13px',
+                  margin: 0,
+                  lineHeight: '1.6'
+                }}>
+                  <span style={{ fontWeight: '600', color: '#003d99' }}>Instructions: </span>
+                  <span style={{ color: '#333' }}>{med.instructions}</span>
                 </p>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Important Notice */}
-      <div className="bg-warning-50 border-l-4 border-warning-600 p-4 mb-8">
-        <h4 className="font-bold text-warning-800 mb-2 flex items-center gap-2">
-          <span>⚠️</span> Important Notice
+      {/* Important Safety Notice */}
+      <div style={{
+        backgroundColor: '#fffbf0',
+        border: '1px solid #ffc107',
+        borderLeft: '4px solid #ffc107',
+        padding: '16px',
+        marginBottom: '32px',
+        borderRadius: '4px'
+      }}>
+        <h4 style={{
+          fontWeight: '700',
+          color: '#ff8800',
+          margin: 0,
+          marginBottom: '12px',
+          fontSize: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          ⚠️ Important Safety Notice
         </h4>
-        <ul className="text-sm text-warning-900 space-y-1 list-disc list-inside">
-          <li>Take medications exactly as prescribed</li>
+        <ul style={{
+          fontSize: '13px',
+          color: '#666',
+          margin: 0,
+          paddingLeft: '20px',
+          lineHeight: '1.6'
+        }}>
+          <li>Take medications exactly as prescribed by your doctor</li>
           <li>Do not share your medication with others</li>
-          <li>Contact your doctor if you experience any adverse effects</li>
+          <li>Contact your doctor immediately if you experience any adverse effects</li>
           <li>Complete the full course of medication unless advised otherwise</li>
         </ul>
       </div>
 
-      {/* Footer / Signature */}
-      <div className="mt-12 pt-6 border-t-2 border-gray-300">
-        <div className="flex justify-between items-end">
+      {/* Signature Section */}
+      <div style={{
+        marginTop: '48px',
+        paddingTop: '24px',
+        borderTop: '2px solid #ccc'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end'
+        }}>
           <div>
-            <p className="text-xs text-muted-foreground mb-1">This is an electronically generated prescription</p>
-            <p className="text-xs text-muted-foreground">Issued through Telehealth Platform</p>
+            <p style={{
+              fontSize: '12px',
+              color: '#666',
+              margin: '0 0 4px 0'
+            }}>
+              This is an electronically generated prescription
+            </p>
+            <p style={{
+              fontSize: '12px',
+              color: '#666',
+              margin: 0
+            }}>
+              Issued through Digital Healthcare Platform
+            </p>
           </div>
-          <div className="text-right">
-            <div className="border-t-2 border-gray-800 w-64 mb-2"></div>
-            <p className="font-semibold">Dr. {doctorName}</p>
-            <p className="text-xs text-muted-foreground">Digital Signature</p>
-            <p className="text-xs text-muted-foreground mt-1">{format(new Date(prescription.createdAt), 'PPpp')}</p>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{
+              borderTop: '2px solid #333',
+              width: '200px',
+              marginBottom: '8px'
+            }}></div>
+            <p style={{
+              fontWeight: '600',
+              margin: 0,
+              color: '#333'
+            }}>
+              Dr. {doctorName}
+            </p>
+            <p style={{
+              fontSize: '12px',
+              color: '#666',
+              margin: '4px 0 0 0'
+            }}>
+              Digital Signature
+            </p>
+            <p style={{
+              fontSize: '12px',
+              color: '#666',
+              margin: '4px 0 0 0'
+            }}>
+              {format(new Date(prescription.createdAt), 'PPpp')}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Watermark */}
-      <div className="text-center mt-8 opacity-20">
-        <p className="text-xs font-bold tracking-widest text-medical-600">OFFICIAL MEDICAL PRESCRIPTION</p>
+      <div style={{
+        textAlign: 'center',
+        marginTop: '32px',
+        opacity: 0.15
+      }}>
+        <p style={{
+          fontSize: '12px',
+          fontWeight: '700',
+          letterSpacing: '2px',
+          color: '#0066cc',
+          margin: 0
+        }}>
+          OFFICIAL MEDICAL PRESCRIPTION
+        </p>
       </div>
     </div>
   );
@@ -118,28 +388,37 @@ export const printPrescription = () => {
   const printContent = document.getElementById('prescription-pdf');
   if (!printContent) return;
 
-  const printWindow = window.open('', '', 'width=800,height=600');
+  const printWindow = window.open('', '', 'width=900,height=1000');
   if (!printWindow) return;
 
   printWindow.document.write(`
+    <!DOCTYPE html>
     <html>
       <head>
         <title>Prescription</title>
         <style>
-          @page { margin: 20mm; }
+          @page { 
+            size: A4;
+            margin: 20mm; 
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
           body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
             color: #333;
-          }
-          .prescription-paper {
-            max-width: 800px;
-            margin: 0 auto;
             background: white;
-            padding: 40px;
           }
           @media print {
-            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            body { 
+              print-color-adjust: exact; 
+              -webkit-print-color-adjust: exact;
+              -webkit-filter: none;
+              filter: none;
+            }
           }
         </style>
       </head>
@@ -155,4 +434,19 @@ export const printPrescription = () => {
     printWindow.print();
     printWindow.close();
   }, 250);
+};
+
+export const downloadPrescriptionPDF = (prescription: Prescription, doctorName: string, patientName: string) => {
+  const element = document.getElementById('prescription-pdf');
+  if (!element) return;
+
+  const opt = {
+    margin: 10,
+    filename: `prescription-${doctorName.replace(/\s+/g, '-')}-${format(new Date(prescription.createdAt), 'yyyy-MM-dd')}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+
+  html2pdf().set(opt).from(element).save();
 };

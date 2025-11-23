@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { DoctorProfile } from '@/types';
-import { Search, Stethoscope, Calendar as CalendarIcon, Clock, Star, Award, CheckCircle2 } from 'lucide-react';
+import { Search, Stethoscope, Calendar as CalendarIcon, Clock, Star, Award, CheckCircle2, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 const timeSlots = [
@@ -59,6 +59,7 @@ const BookAppointment = () => {
   const fetchDoctors = async () => {
     try {
       const data = await api.getAllDoctors();
+      console.log('Fetched Doctors:', data);
       const verified = data.filter((doc: DoctorProfile) => doc.isVerified);
       setDoctors(verified);
       setFilteredDoctors(verified);
@@ -67,14 +68,18 @@ const BookAppointment = () => {
       const names: Record<string, string> = {};
       await Promise.all(verified.map(async (doc: DoctorProfile) => {
         try {
-          const userData = await api.getUser(doc.user_id);
-          names[doc.user_id] = userData.name;
-        } catch {
-          names[doc.user_id] = 'Unknown Doctor';
+          const userData = await api.getUser(doc.user_id, token);
+          console.log(`Fetched user for doctor ${doc._id}:`, userData);
+          names[doc._id] = userData.name;
+        } catch (error) {
+          console.error(`Failed to fetch user ${doc.user_id}:`, error);
+          names[doc._id] = 'Unknown Doctor';
         }
       }));
+      console.log('Doctor names mapping:', names);
       setDoctorNames(names);
     } catch (error) {
+      console.error('Error fetching doctors:', error);
       toast({
         title: 'Failed to load doctors',
         variant: 'destructive',
@@ -109,7 +114,7 @@ const BookAppointment = () => {
 
     if (searchQuery) {
       filtered = filtered.filter((doc) =>
-        doc.user?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctorNames[doc._id]?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.specialty.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
@@ -154,14 +159,8 @@ const BookAppointment = () => {
       setBooking(false);
     }
   };
-console.log('Selected Doctor:', selectedDoctor);
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Book an Appointment</h1>
-        <p className="text-muted-foreground">Find and schedule a consultation with our verified doctors</p>
-      </div>
-
       {!selectedDoctor ? (
         <div className="space-y-6">
           {/* Search and Filter */}
@@ -225,7 +224,12 @@ console.log('Selected Doctor:', selectedDoctor);
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div>
                             <h3 className="font-semibold text-lg text-foreground">
-                              Dr. {doctorNames[doctor.user_id] || doctor.user?.name || 'Unknown Doctor'}
+                              <Link 
+                                to={`/patient/doctor-profile/${doctor.user_id}`}
+                                className="hover:text-primary transition-colors hover:underline"
+                              >
+                                Dr. {doctorNames[doctor._id] || 'Loading...'}
+                              </Link>
                             </h3>
                             <Badge variant="secondary" className="mt-1">
                               {doctor.specialty}
@@ -283,10 +287,18 @@ console.log('Selected Doctor:', selectedDoctor);
                   <Stethoscope className="h-8 w-8 text-secondary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">Dr. {selectedDoctorUser?.name || selectedDoctor.user?.name || '...'}</h3>
+                  <h3 className="font-semibold text-lg">Dr. {doctorNames[selectedDoctor._id] || '...'}</h3>
                   <Badge variant="secondary" className="mt-1">{selectedDoctor.specialty}</Badge>
                 </div>
               </div>
+              <Button 
+                onClick={() => navigate(`/patient/doctor-profile/${selectedDoctor.user_id}`)} 
+                variant="outline"
+                className="w-full gap-2"
+              >
+                <User className="h-4 w-4" />
+                View Full Profile
+              </Button>
               <p className="text-sm text-muted-foreground">{selectedDoctor.bio}</p>
               {selectedDoctor.pricePerHour && (
                 <div className="p-3 bg-muted rounded-lg">
