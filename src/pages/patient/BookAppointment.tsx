@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
@@ -36,7 +35,7 @@ const BookAppointment = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,29 +168,56 @@ const BookAppointment = () => {
       const [hours, minutes] = startTime.split(':');
       scheduledTime.setHours(parseInt(hours), parseInt(minutes));
 
-      const appointment = await api.createAppointment({
+      const hours_duration = calculateDuration();
+
+      // Create appointment with hours field
+      const response = await api.createAppointment({
         patient_id: user?._id!,
         doctor_id: selectedDoctor!.user_id,
         scheduled_time: scheduledTime.toISOString(),
-      });
+        hours: hours_duration,
+      } as any);
+
+      const { appointment, payment } = response;
 
       toast({
-        title: 'Proceeding to payment',
-        description: 'Your appointment details have been saved.',
+        title: 'Processing payment',
+        description: 'Redirecting to Chapa...',
       });
-      
-      setShowPaymentModal(false);
-      // Navigate to payment page with appointment details
-      navigate('/patient/payment', { state: { appointmentId: appointment._id, amount: calculateCost() } });
+
+      // Calculate cost for Chapa
+      const totalAmount = hours_duration * (selectedDoctor!.pricePerHour || 0);
+
+      // Get the return URL for after payment
+      const returnUrl = `${window.location.origin}/patient/payment-status?appointment_id=${appointment._id}`;
+
+      // Initialize payment directly with Chapa
+      const paymentResponse = await api.initializePayment({
+        appointment_id: appointment._id,
+        amount: totalAmount,
+        currency: 'ETB',
+        return_url: returnUrl,
+      }, token);
+
+      if (paymentResponse.checkout_url) {
+        // Redirect directly to Chapa checkout
+        setShowPaymentModal(false);
+        window.location.href = paymentResponse.checkout_url;
+      } else {
+        throw new Error('Failed to get Chapa checkout URL');
+      }
     } catch (error) {
+      console.error('Error creating appointment or initializing payment:', error);
       toast({
-        title: 'Failed to create appointment',
+        title: 'Failed to process',
+        description: error instanceof Error ? error.message : 'Please try again',
         variant: 'destructive',
       });
     } finally {
       setBooking(false);
     }
   };
+
   return (
     <div className="space-y-8 animate-fade-in">
       {!selectedDoctor ? (
@@ -257,7 +283,7 @@ const BookAppointment = () => {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div>
                             <h3 className="font-semibold text-lg text-foreground">
-                              <Link 
+                              <Link
                                 to={`/patient/doctor-profile/${doctor.user_id}`}
                                 className="hover:text-primary transition-colors hover:underline"
                               >
@@ -324,8 +350,8 @@ const BookAppointment = () => {
                   <Badge variant="secondary" className="mt-1">{selectedDoctor.specialty}</Badge>
                 </div>
               </div>
-              <Button 
-                onClick={() => navigate(`/patient/doctor-profile/${selectedDoctor.user_id}`)} 
+              <Button
+                onClick={() => navigate(`/patient/doctor-profile/${selectedDoctor.user_id}`)}
                 variant="outline"
                 className="w-full gap-2"
               >
@@ -354,50 +380,47 @@ const BookAppointment = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CalendarIcon className="h-5 w-5 text-primary" />
-                Select Date & Time
+                Book Your Appointment
               </CardTitle>
-              <CardDescription>Choose your preferred appointment slot</CardDescription>
+              <CardDescription>Select your preferred date and time</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="date" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="date" className="gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    Date
-                  </TabsTrigger>
-                  <TabsTrigger value="time" className="gap-2" disabled={!selectedDate}>
-                    <Clock className="h-4 w-4" />
-                    Time
-                  </TabsTrigger>
-                </TabsList>
+            <CardContent className="space-y-10">
+ 
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <CalendarIcon className="h-4 w-4 text-primary" />
+                  Select Date
+                </label>
 
-                <TabsContent value="date" className="space-y-4">
-                  <div className="flex justify-center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => date < new Date()}
-                      className="rounded-md border"
-                    />
-                  </div>
-                  {selectedDate && (
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Selected date:</p>
-                      <p className="font-semibold text-lg">{format(selectedDate, 'PPP')}</p>
-                    </div>
-                  )}
-                </TabsContent>
+                <input
+                  type="date"
+                  value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                  min={format(new Date(), "yyyy-MM-dd")}
+                  className="w-full h-14 px-4 rounded-xl border-2 border-muted 
+                          bg-gradient-to-br from-background to-muted/30 
+                          hover:border-primary/40 transition-all shadow-sm"
+                /> 
+              </div>
+ 
+              {selectedDate && (
+                <div className="space-y-10">
 
-                <TabsContent value="time" className="space-y-4">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Start Time</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* START TIME */}
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Start Time
+                      </label>
+
                       <Select value={startTime} onValueChange={setStartTime}>
-                        <SelectTrigger className="w-full h-11">
+                        <SelectTrigger className="h-14 rounded-xl border-2 border-muted bg-gradient-to-br 
+                        from-background to-muted/30 hover:border-primary/40 transition shadow-sm">
                           <SelectValue placeholder="Select start time" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl max-h-64">
                           {timeSlots.map((time) => (
                             <SelectItem key={time} value={time}>
                               {time}
@@ -405,15 +428,26 @@ const BookAppointment = () => {
                           ))}
                         </SelectContent>
                       </Select>
+ 
                     </div>
 
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">End Time</label>
-                      <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
-                        <SelectTrigger className="w-full h-11">
-                          <SelectValue placeholder="Select end time" />
+                    {/* END TIME */}
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Clock className="h-4 w-4 text-primary" />
+                        End Time
+                      </label>
+
+                      <Select
+                        value={endTime}
+                        onValueChange={setEndTime}
+                        disabled={!startTime}
+                      >
+                        <SelectTrigger className="h-14 rounded-xl border-2 border-muted bg-gradient-to-br 
+                        from-background to-muted/30 hover:border-primary/40 disabled:opacity-50 transition shadow-sm">
+                          <SelectValue placeholder={startTime ? "Select end time" : "Select start time first"} />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl max-h-64">
                           {timeSlots.map((time) => (
                             <SelectItem key={time} value={time}>
                               {time}
@@ -421,40 +455,72 @@ const BookAppointment = () => {
                           ))}
                         </SelectContent>
                       </Select>
+ 
                     </div>
+
                   </div>
-                  
+
+                  {/* ================== SUMMARY ================== */}
                   {startTime && endTime && calculateDuration() > 0 && (
-                    <div className="text-center pt-4 border-t space-y-4">
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          Appointment: {format(selectedDate!, 'PPP')}
-                        </p>
-                        <p className="font-medium">
-                          {startTime} - {endTime} ({calculateDuration()} hour{calculateDuration() !== 1 ? 's' : ''})
-                        </p>
-                        {selectedDoctor?.pricePerHour && (
-                          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg">
-                            <DollarSign className="h-4 w-4 text-primary" />
-                            <span className="font-semibold text-lg text-primary">
-                              ${calculateCost().toFixed(2)}
+                    <div className="space-y-6">
+
+                      <div className="p-5 rounded-xl bg-primary/5 border border-primary/20 space-y-4">
+
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Date</p>
+                            <p className="font-semibold text-sm">
+                              {format(selectedDate, "MMM dd")}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-muted-foreground">Duration</p>
+                            <p className="font-semibold text-sm">
+                              {calculateDuration()} hour{calculateDuration() !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-primary/10 pt-3">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">Time Slot</span>
+                            <span className="text-sm font-semibold">
+                              {startTime} - {endTime}
                             </span>
                           </div>
-                        )}
+
+                          {selectedDoctor?.pricePerHour && (
+                            <div className="flex justify-between border-t border-primary/10 pt-3">
+                              <span className="text-sm text-muted-foreground">Rate</span>
+                              <span className="text-sm font-semibold">
+                                ${selectedDoctor.pricePerHour}/hr
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between border-t-2 border-primary/30 pt-4">
+                          <span className="font-semibold">Total Cost</span>
+                          <span className="text-2xl font-bold text-primary">
+                            ${calculateCost().toFixed(2)}
+                          </span>
+                        </div>
+
                       </div>
-                      <Button
-                        size="lg"
-                        onClick={handleBookAppointment}
-                        className="gap-2"
-                      >
+
+                      <Button className="h-12 w-full text-base gap-2" onClick={handleBookAppointment}>
                         <CheckCircle2 className="h-5 w-5" />
-                        Book Appointment
+                        Proceed to Book Appointment
                       </Button>
+
                     </div>
                   )}
-                </TabsContent>
-              </Tabs>
+
+                </div>
+              )}
             </CardContent>
+
           </Card>
         </div>
       )}

@@ -58,8 +58,31 @@ const PatientMessages = () => {
   }, [token, user, searchParams]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Trigger scroll when messages update or conversation changes
+    const timer = setTimeout(() => {
+      scrollToBottom();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [messages, directMessages, selectedDoctorId]);
+
+  useEffect(() => {
+    if (!token || !user) return;
+    
+    // Auto-refresh all messages every 2.5 seconds
+    const interval = setInterval(() => {
+      if (directMessageMode && selectedDoctorId) {
+        const user1 = searchParams.get('user1');
+        const user2 = searchParams.get('user2');
+        if (user1 && user2) {
+          fetchMessagesBetweenUsers(user1, user2);
+        }
+      } else {
+        fetchMessagesByUser();
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [token, user, selectedDoctorId, directMessageMode, searchParams]);
 
   const fetchAppointmentsAndDoctors = async () => {
     try {
@@ -127,7 +150,11 @@ const PatientMessages = () => {
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Find the scroll viewport inside the ScrollArea
+      const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
   };
 
@@ -181,9 +208,15 @@ const PatientMessages = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in"> 
+    <div className="space-y-6 animate-fade-in">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Messages</h1>
+        <p className="text-muted-foreground mt-2">
+          Communicate with your doctors
+        </p>
+      </div>
 
-      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-150px)]">
+      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
         {/* Conversations List */}
         {!directMessageMode ? (
         <Card className="lg:col-span-1">
@@ -263,10 +296,10 @@ const PatientMessages = () => {
         ) : null}
 
         {/* Chat Area by Doctor */}
-        <Card className={cn("flex flex-col", directMessageMode ? "lg:col-span-3" : "lg:col-span-2")}>
+        <Card className={cn("flex flex-col h-full overflow-hidden", directMessageMode ? "lg:col-span-3" : "lg:col-span-2")}>
           {selectedDoctorId ? (
             <>
-              <CardHeader className="border-b">
+              <CardHeader className="border-b flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12 border-2 border-background">
@@ -321,8 +354,8 @@ const PatientMessages = () => {
                 </div>
               </CardHeader>
 
-              <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-                <div className="space-y-4">
+              <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+                <div className="space-y-4 p-4">
                   {(directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedDoctorId || m.sender_id === selectedDoctorId))).length > 0 ? (
                     (directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedDoctorId || m.sender_id === selectedDoctorId))).map((message) => {
                       const isOwn = message.sender_id === user?._id;
@@ -381,7 +414,7 @@ const PatientMessages = () => {
                 </div>
               </ScrollArea>
 
-              <div className="p-4 border-t">
+              <div className="p-4 border-t flex-shrink-0">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();

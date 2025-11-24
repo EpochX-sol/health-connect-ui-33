@@ -3,25 +3,20 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Lock, CheckCircle2, DollarSign } from 'lucide-react';
+import { api } from '@/lib/api';
+import { Lock, CheckCircle2, DollarSign, Loader2, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 
-const Payment = () => {
+const PatientPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { token } = useAuth();
   const { toast } = useToast();
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const { appointmentId, amount } = location.state || {};
-
-  const [paymentDetails, setPaymentDetails] = useState({
-    cardNumber: '',
-    cardName: '',
-    expiryDate: '',
-    cvv: '',
-  });
+  const { appointmentId, amount, paymentId, doctorName, appointmentTime } = location.state || {};
 
   useEffect(() => {
     if (!appointmentId || !amount) {
@@ -34,34 +29,45 @@ const Payment = () => {
     }
   }, [appointmentId, amount, navigate, toast]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setPaymentDetails((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!paymentDetails.cardNumber || !paymentDetails.cardName || !paymentDetails.expiryDate || !paymentDetails.cvv) {
-      toast({
-        title: 'Missing information',
-        description: 'Please fill in all payment details',
-        variant: 'destructive',
-      });
+  const handleProceedToChapa = async () => {
+    if (!appointmentId || !amount || !token) {
+      setError('Missing payment information');
       return;
     }
 
     setProcessing(true);
+    setError(null);
     
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      // Get the current location URL for return_url
+      const returnUrl = `${window.location.origin}/patient/payment-status?appointment_id=${appointmentId}`;
+
+      // Initialize payment with Chapa
+      const paymentResponse = await api.initializePayment({
+        appointment_id: appointmentId,
+        amount: amount,
+        currency: 'ETB',
+        return_url: returnUrl,
+      }, token);
+
+      if (paymentResponse.checkout_url) {
+        // Redirect to Chapa checkout
+        window.location.href = paymentResponse.checkout_url;
+      } else {
+        throw new Error('Failed to get checkout URL');
+      }
+    } catch (err) {
+      console.error('Payment initialization error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
+      setError(errorMessage);
       toast({
-        title: 'Payment successful!',
-        description: 'Your appointment has been confirmed.',
+        title: 'Payment Error',
+        description: errorMessage,
+        variant: 'destructive',
       });
+    } finally {
       setProcessing(false);
-      navigate('/patient/appointments');
-    }, 2000);
+    }
   };
 
   return (
@@ -79,107 +85,105 @@ const Payment = () => {
             Payment Summary
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="space-y-3">
+            {doctorName && (
+              <div className="flex justify-between items-center pb-3 border-b">
+                <span className="text-muted-foreground">Doctor</span>
+                <span className="font-medium">Dr. {doctorName}</span>
+              </div>
+            )}
+            
+            {appointmentTime && (
+              <div className="flex justify-between items-center pb-3 border-b">
+                <span className="text-muted-foreground">Appointment Date & Time</span>
+                <span className="font-medium">{format(new Date(appointmentTime), 'PPp')}</span>
+              </div>
+            )}
+            
             <div className="flex justify-between items-center pb-3 border-b">
               <span className="text-muted-foreground">Consultation Fee</span>
-              <span className="text-2xl font-bold text-primary">${amount?.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-primary">{amount ? `${amount.toFixed(2)} ETB` : 'Loading...'}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
               <Lock className="h-4 w-4" />
-              <span>Your payment information is secure and encrypted</span>
+              <span>Your payment is processed securely through Chapa</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Payment Form */}
+      {/* Payment Options */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-primary" />
-            Payment Details
+            <DollarSign className="h-5 w-5 text-primary" />
+            Payment Method
           </CardTitle>
-          <CardDescription>Enter your card information to complete the payment</CardDescription>
+          <CardDescription>Pay securely using Chapa payment gateway</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handlePayment} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cardNumber">Card Number</Label>
-              <Input
-                id="cardNumber"
-                name="cardNumber"
-                placeholder="1234 5678 9012 3456"
-                value={paymentDetails.cardNumber}
-                onChange={handleInputChange}
-                maxLength={19}
-              />
+        <CardContent className="space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <p className="text-sm text-destructive">{error}</p>
             </div>
+          )}
 
-            <div className="space-y-2">
-              <Label htmlFor="cardName">Cardholder Name</Label>
-              <Input
-                id="cardName"
-                name="cardName"
-                placeholder="John Doe"
-                value={paymentDetails.cardName}
-                onChange={handleInputChange}
-              />
-            </div>
+          <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+            <h3 className="font-semibold text-foreground">Supported Payment Methods</h3>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• Bank transfer</li>
+              <li>• Card payment</li>
+              <li>• Mobile money (Telebirr)</li>
+            </ul>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
-                <Input
-                  id="expiryDate"
-                  name="expiryDate"
-                  placeholder="MM/YY"
-                  value={paymentDetails.expiryDate}
-                  onChange={handleInputChange}
-                  maxLength={5}
-                />
-              </div>
+          <div className="pt-4 space-y-3">
+            <Button
+              size="lg"
+              className="w-full gap-2"
+              onClick={handleProceedToChapa}
+              disabled={processing || !appointmentId || !amount}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5" />
+                  Proceed to Payment
+                </>
+              )}
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate('/patient/book-appointment')}
+              disabled={processing}
+            >
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-              <div className="space-y-2">
-                <Label htmlFor="cvv">CVV</Label>
-                <Input
-                  id="cvv"
-                  name="cvv"
-                  type="password"
-                  placeholder="123"
-                  value={paymentDetails.cvv}
-                  onChange={handleInputChange}
-                  maxLength={4}
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 space-y-3">
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full gap-2"
-                disabled={processing}
-              >
-                <CheckCircle2 className="h-5 w-5" />
-                {processing ? 'Processing Payment...' : `Pay $${amount?.toFixed(2)}`}
-              </Button>
-              
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate('/patient/book-appointment')}
-                disabled={processing}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+      {/* Payment Info */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="pt-6">
+          <div className="space-y-2 text-sm text-blue-900">
+            <p className="font-semibold">ℹ️ Payment Information</p>
+            <p>You will be redirected to our secure payment provider Chapa where you can choose your preferred payment method.</p>
+            <p>After successful payment, you will be redirected back to confirm your appointment.</p>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 };
 
-export default Payment;
+export default PatientPayment;

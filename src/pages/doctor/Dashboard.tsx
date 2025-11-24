@@ -13,21 +13,62 @@ const DoctorDashboard = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [patientNames, setPatientNames] = useState<Record<string, string>>({});
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!token || !user) return;
-      console.log(token, user);
       try {
-        const [appointmentsData, profileData] = await Promise.all([
-          api.getAppointments(token),
-          api.getDoctorProfile(user._id, token)
-        ]);
+        // Fetch doctor's appointments - first try the specific endpoint
+        let appointmentsData = [];
+        try {
+          appointmentsData = await api.getAppointmentsForDoctor(user._id, token);
+          console.log('getAppointmentsForDoctor result:', appointmentsData);
+        } catch (error) {
+          console.error('getAppointmentsForDoctor failed, trying getAllAppointments:', error);
+          // Fallback to getting all appointments and filtering by doctor_id
+          const allAppointments = await api.getAppointments(token);
+          console.log('All appointments:', allAppointments);
+          appointmentsData = allAppointments.filter((apt: Appointment) => apt.doctor_id === user._id);
+          console.log('Filtered appointments for doctor:', appointmentsData);
+        }
         
-        setAppointments(appointmentsData);
+        // Fetch doctor profile using doctor_id from profile
+        let profileData = null;
+        try {
+          // Try fetching by user._id first (assuming the backend accepts user_id lookup)
+          const allDoctors = await api.getAllDoctors(token);
+          console.log('All doctors:', allDoctors);
+          profileData = allDoctors.find((doc: DoctorProfile) => doc.user_id === user._id);
+          console.log('Doctor profile found:', profileData);
+        } catch (error) {
+          console.error('Failed to fetch doctor profile:', error);
+          // If that fails, we'll proceed without it
+        }
+        
+        setAppointments(appointmentsData || []);
         setDoctorProfile(profileData);
+
+        // Fetch patient names for all appointments
+        if (appointmentsData && appointmentsData.length > 0) {
+          const patientIds = [...new Set(appointmentsData.map((apt: Appointment) => apt.patient_id))];
+          const names: Record<string, string> = {};
+          
+          await Promise.all(patientIds.map(async (patientId: string) => {
+            try {
+              const patientData = await api.getUser(patientId, token);
+              names[patientId] = patientData.name;
+            } catch (error) {
+              console.error(`Failed to fetch patient ${patientId}:`, error);
+              names[patientId] = 'Unknown Patient';
+            }
+          }));
+          
+          console.log('Patient names mapping:', names);
+          setPatientNames(names);
+        }
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -38,9 +79,10 @@ const DoctorDashboard = () => {
     fetchData();
   }, [token, user]);
 
-  const upcomingAppointments = appointments.filter(
-    apt => apt.status === 'booked' && new Date(apt.scheduled_time) > new Date()
-  ).slice(0, 3);
+  const upcomingAppointments = appointments
+    .filter(apt => apt.status === 'booked' && new Date(apt.scheduled_time) > new Date())
+    .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime())
+    .slice(0, 5);
 
   const todayAppointments = appointments.filter(apt => {
     const aptDate = new Date(apt.scheduled_time);
@@ -55,7 +97,8 @@ const DoctorDashboard = () => {
   const totalEarnings = appointments
     .filter(apt => apt.status === 'completed')
     .reduce((sum, apt) => {
-      return sum + (apt.payment_id?.amount || doctorProfile?.pricePerHour || 0);
+      const paymentAmount = typeof apt.payment_id === 'object' && apt.payment_id?.amount ? apt.payment_id.amount : 0;
+      return sum + (paymentAmount || doctorProfile?.pricePerHour || 0);
     }, 0);
 
   const stats = [
@@ -85,9 +128,9 @@ const DoctorDashboard = () => {
     },
     {
       title: 'Verification',
-      value: doctorProfile?.isVerified ? 'Verified' : 'Pending',
+      value: doctorProfile?.isVerified ? 'Approved' : 'Pending',
       icon: Activity,
-      description: doctorProfile?.verificationStatus || 'Not started',
+      description: doctorProfile?.verificationStatus || 'pending',
       color: doctorProfile?.isVerified ? 'text-success-600' : 'text-warning-600',
       bg: doctorProfile?.isVerified ? 'bg-success-100' : 'bg-warning-100'
     }
@@ -122,28 +165,7 @@ const DoctorDashboard = () => {
           </div>
         </div>
       </div>
-
-      {/* Available Balance Card */}
-      <Card className="border-none shadow-elegant bg-gradient-to-br from-success-50 to-success-100">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-success-900 mb-2">Available Balance</p>
-              <p className="text-4xl font-bold text-success-600">${totalEarnings.toFixed(2)}</p>
-              <p className="text-xs text-success-700 mt-2">From {completedCount} completed appointments</p>
-              <Button 
-                className="mt-4 bg-success-600 hover:bg-success-700 text-white"
-                size="sm"
-              >
-                Request Withdrawal
-              </Button>
-            </div>
-            <div className="p-3 bg-white/60 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-success-600" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+ 
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -225,14 +247,14 @@ const DoctorDashboard = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-foreground">
-                        {appointment.patient?.name || 'Patient'}
+                        {patientNames[appointment.patient_id] || 'Patient'}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {format(new Date(appointment.scheduled_time), 'MMMM dd, yyyy • h:mm a')}
                       </p>
-                      {appointment.type && (
+                      {appointment.hours && (
                         <Badge variant="outline" className="mt-2">
-                          {appointment.type}
+                          {appointment.hours} hour{appointment.hours > 1 ? 's' : ''}
                         </Badge>
                       )}
                     </div>

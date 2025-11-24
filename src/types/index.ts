@@ -21,6 +21,13 @@ export interface DoctorProfile {
   verificationStatus: 'pending' | 'approved' | 'rejected';
   verificationNotes?: string;
   pricePerHour?: number;
+  availableBalance?: number;
+  paymentDetails?: {
+    bank?: string;
+    accountNumber?: string;
+    accountHolderName?: string;
+    phoneNumber?: string;
+  };
   createdAt: string;
   user?: User;
 }
@@ -36,12 +43,16 @@ export interface Appointment {
   };
   scheduled_time: string;
   dateTime?: string;
+  hours?: number;
+  totalAmount?: number;
   status: 'booked' | 'completed' | 'cancelled' | 'in-progress';
   roomName: string;
   type?: string;
   notes?: string;
-  payment_id?: {
+  payment_id?: string | {
+    _id?: string;
     amount: number;
+    status?: string;
   };
   createdAt: string;
   patient?: User;

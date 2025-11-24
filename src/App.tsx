@@ -14,6 +14,7 @@ import PatientProfile from "./pages/patient/Profile";
 import PatientAppointments from "./pages/patient/Appointments";
 import BookAppointment from "./pages/patient/BookAppointment";
 import PatientPayment from "./pages/patient/Payment";
+import PatientPaymentStatus from "./pages/patient/PaymentStatus";
 import PatientMessages from "./pages/patient/Messages";
 import PatientPrescriptions from "./pages/patient/Prescriptions";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="doctor-profile/:id" element={<DoctorProfilePage />} />
               <Route path="book-appointment" element={<BookAppointment />} />
               <Route path="payment" element={<PatientPayment />} />
+              <Route path="payment-status" element={<PatientPaymentStatus />} />
               <Route path="messages" element={<PatientMessages />} />
               <Route path="prescriptions" element={<PatientPrescriptions />} />
             </Route>

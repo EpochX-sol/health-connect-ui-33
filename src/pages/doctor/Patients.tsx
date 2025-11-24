@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Appointment, User as UserType } from '@/types';
 
 interface PatientData {
+  patientId: string;
   patient: UserType;
   totalAppointments: number;
   completedAppointments: number;
@@ -18,7 +19,7 @@ interface PatientData {
 }
 
 const DoctorPatients = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<PatientData[]>([]);
@@ -27,7 +28,7 @@ const DoctorPatients = () => {
 
   useEffect(() => {
     fetchPatients();
-  }, [token]);
+  }, [token, user]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -45,18 +46,56 @@ const DoctorPatients = () => {
   }, [searchQuery, patients]);
 
   const fetchPatients = async () => {
-    if (!token) return;
+    if (!token || !user) return;
 
     try {
-      const appointments: Appointment[] = await api.getAppointments(token);
-      
-      // Group appointments by patient
+      // Fetch doctor's appointments
+      let appointmentsData = [];
+      try {
+        appointmentsData = await api.getAppointmentsForDoctor(user._id, token);
+      } catch (error) {
+        console.error('getAppointmentsForDoctor failed, trying getAllAppointments:', error);
+        // Fallback to getting all appointments and filtering by doctor_id
+        const allAppointments = await api.getAppointments(token);
+        appointmentsData = allAppointments.filter((apt: Appointment) => apt.doctor_id === user._id);
+      }
+
+      console.log('Doctor appointments:', appointmentsData);
+
+      // Group appointments by patient and fetch patient details
       const patientMap = new Map<string, PatientData>();
       
-      appointments.forEach((apt) => {
-        if (!apt.patient) return;
+      // Get unique patient IDs
+      const patientIds = [...new Set(appointmentsData.map((apt: Appointment) => apt.patient_id))];
+      
+      // Fetch all patient data
+      const patientDataMap: Record<string, UserType> = {};
+      await Promise.all(patientIds.map(async (patientId: string) => {
+        try {
+          const userData = await api.getUser(patientId, token);
+          patientDataMap[patientId] = userData;
+        } catch (error) {
+          console.error(`Failed to fetch patient ${patientId}:`, error);
+          // Create a placeholder user object
+          patientDataMap[patientId] = {
+            _id: patientId,
+            name: 'Unknown Patient',
+            email: 'unknown@example.com',
+            role: 'patient',
+            createdAt: new Date().toISOString()
+          };
+        }
+      }));
+
+      console.log('Patient data map:', patientDataMap);
+
+      // Now group appointments by patient
+      appointmentsData.forEach((apt: Appointment) => {
+        const patientId = apt.patient_id;
+        const patientInfo = patientDataMap[patientId];
         
-        const patientId = apt.patient._id;
+        if (!patientInfo) return;
+        
         const existing = patientMap.get(patientId);
         
         if (existing) {
@@ -70,7 +109,8 @@ const DoctorPatients = () => {
           }
         } else {
           patientMap.set(patientId, {
-            patient: apt.patient,
+            patientId,
+            patient: patientInfo,
             totalAppointments: 1,
             completedAppointments: apt.status === 'completed' ? 1 : 0,
             lastAppointment: apt.scheduled_time
@@ -79,6 +119,7 @@ const DoctorPatients = () => {
       });
       
       const patientsArray = Array.from(patientMap.values());
+      console.log('Processed patients:', patientsArray);
       setPatients(patientsArray);
       setFilteredPatients(patientsArray);
     } catch (error) {
@@ -185,7 +226,7 @@ const DoctorPatients = () => {
       ) : (
         <div className="grid gap-4">
           {filteredPatients.map((patientData) => (
-            <Card key={patientData.patient._id} className="shadow-elegant hover:shadow-glow transition-all">
+            <Card key={patientData.patientId} className="shadow-elegant hover:shadow-glow transition-all">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1">

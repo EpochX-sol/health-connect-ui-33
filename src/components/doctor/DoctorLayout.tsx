@@ -47,10 +47,10 @@ const DoctorLayout = () => {
 
   const menuItems = [
     { to: '/doctor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/doctor/messages', icon: MessageSquare, label: 'Messages' },
     { to: '/doctor/appointments', icon: Calendar, label: 'Appointments' },
     { to: '/doctor/patients', icon: Users, label: 'Patients' },
     { to: '/doctor/prescriptions', icon: FileText, label: 'Prescriptions' },
-    { to: '/doctor/messages', icon: MessageSquare, label: 'Messages' },
     { to: '/doctor/payment', icon: Wallet, label: 'Payment' },
   ];
 
@@ -61,7 +61,7 @@ const DoctorLayout = () => {
         <Sidebar collapsible="icon">
           <SidebarContent>
             <SidebarGroup>
-              <div className="p-4 flex items-center gap-3 border-b border-sidebar-border">
+              <div className="p-4 flex items-center gap-3  group-data-[collapsible=icon]:hidden border-b border-sidebar-border">
                 <div className="p-2 rounded-lg bg-gradient-medical">
                   <Stethoscope className="h-5 w-5 text-white" />
                 </div>
@@ -71,7 +71,7 @@ const DoctorLayout = () => {
                 </div>
               </div>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="pt-4">
                   {menuItems.map((item) => (
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton asChild tooltip={item.label}>
@@ -93,9 +93,9 @@ const DoctorLayout = () => {
         </Sidebar>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col bg-gradient-to-br from-background via-medical-50 to-medical-100">
+        <div className="flex-1 flex flex-col   from-background via-medical-50 to-medical-100">
           {/* Header */}
-          <header className="bg-background/80 backdrop-blur-lg border-b border-border shadow-elegant sticky top-0 z-40">
+          <header className="bg-background/80 border-b border-border sticky top-0 z-40">
             <div className="px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SidebarTrigger />
