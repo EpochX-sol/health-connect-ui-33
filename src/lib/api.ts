@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://proj-babi.onrender.com/api';
+const API_BASE_URL = `${import.meta.env.VITE_BACKEND_URL}/api `|| 'https://proj-babi.onrender.com/api';
 
 export const api = {
     getMessagesByUser: async (userId: string, token?: string) => {
