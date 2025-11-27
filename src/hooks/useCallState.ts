@@ -137,9 +137,14 @@ export const useCallState = (socket: Socket | null) => {
             participantName: prevOut.recipientName,
             startTime: new Date(),
           });
-          console.log('[CALL] Creating peer connection as initiator');
-          // Create peer connection as we're the initiator
-          // This will happen through the active call listeners
+          
+          // CRITICAL: Emit join-room to enter WebRTC room
+          console.log('[CALL] Joining WebRTC room:', data.roomId);
+          socket?.emit('join-room', {
+            roomId: data.roomId,
+            userId: user?._id,
+            userName: user?.name
+          });
         }
         return null;
       });
@@ -164,6 +169,14 @@ export const useCallState = (socket: Socket | null) => {
             participantId: prevIn.callerId,
             participantName: prevIn.callerName,
             startTime: new Date(),
+          });
+          
+          // CRITICAL: Emit join-room to enter WebRTC room
+          console.log('[CALL] Joining WebRTC room:', data.roomId);
+          socket?.emit('join-room', {
+            roomId: data.roomId,
+            userId: user?._id,
+            userName: user?.name
           });
         }
         return null;
@@ -255,19 +268,51 @@ export const useCallState = (socket: Socket | null) => {
       setIsUserOnline(true);
     });
 
-    // WebRTC signaling listeners
-    socket.on('webrtc-offer', async (data: { offer: RTCSessionDescriptionInit; from: string }) => {
-      console.log('Received WebRTC offer from:', data.from);
+    // Listen for existing participants when joining room (as joiner, we create offer for each)
+    socket.on('existing-participants', async (participants: Array<{ socketId: string; userId: string; userName: string }>) => {
+      console.log('[WebRTC] Existing participants in room:', participants);
+      for (const participant of participants) {
+        // We are the joiner, so we create the offer
+        await createPeerConnection(participant.socketId, true);
+      }
+    });
+
+    // Listen for new user joining room (as existing, they will create offer)
+    socket.on('user-joined', async (data: { socketId: string; userId: string; userName: string }) => {
+      console.log('[WebRTC] User joined room:', data);
+      // New user joined, they will create the offer
+      // We just prepare to receive it
+      await createPeerConnection(data.socketId, false);
+    });
+
+    // Listen for user leaving room
+    socket.on('user-left', ({ socketId }: { socketId: string }) => {
+      console.log('[WebRTC] User left room:', socketId);
+      const peerConnection = peerConnectionsRef.current.get(socketId);
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnectionsRef.current.delete(socketId);
+        setRemoteStreams(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(socketId);
+          return newMap;
+        });
+      }
+    });
+
+    // WebRTC signaling listeners (standard naming: offer, answer, ice-candidate)
+    socket.on('offer', async (data: { offer: RTCSessionDescriptionInit; from: string }) => {
+      console.log('[WebRTC] Received offer from:', data.from);
       await handleWebRTCOffer(data.offer, data.from);
     });
 
-    socket.on('webrtc-answer', async (data: { answer: RTCSessionDescriptionInit; from: string }) => {
-      console.log('Received WebRTC answer from:', data.from);
+    socket.on('answer', async (data: { answer: RTCSessionDescriptionInit; from: string }) => {
+      console.log('[WebRTC] Received answer from:', data.from);
       await handleWebRTCAnswer(data.answer, data.from);
     });
 
     socket.on('ice-candidate', async (data: { candidate: RTCIceCandidateInit; from: string }) => {
-      console.log('Received ICE candidate from:', data.from);
+      console.log('[WebRTC] Received ICE candidate from:', data.from);
       await handleICECandidate(data.candidate, data.from);
     });
 
@@ -284,11 +329,14 @@ export const useCallState = (socket: Socket | null) => {
       socket.off('user-disconnected-during-call');
       socket.off('disconnect');
       socket.off('connect');
-      socket.off('webrtc-offer');
-      socket.off('webrtc-answer');
+      socket.off('existing-participants');
+      socket.off('user-joined');
+      socket.off('user-left');
+      socket.off('offer');
+      socket.off('answer');
       socket.off('ice-candidate');
     };
-  }, [socket, user, outgoingCall, incomingCall]);
+  }, [socket, user, outgoingCall, incomingCall, createPeerConnection]);
 
   // Get media stream for call
   const getMediaStream = useCallback(async (callType: 'voice' | 'video') => {
@@ -558,19 +606,24 @@ export const useCallState = (socket: Socket | null) => {
         console.log(`[WebRTC] Peer connection created and stored`);
 
         // If initiator, create and send offer
-        if (isInitiator && socket && activeCall) {
+        if (isInitiator) {
+          if (!socket || !activeCall) {
+            console.warn('[WebRTC] Cannot create offer - missing socket or activeCall');
+            return peerConnection;
+          }
+          
           console.log(`[WebRTC] Creating offer for ${remoteSocketId}`);
           const offer = await peerConnection.createOffer();
           await peerConnection.setLocalDescription(offer);
 
-          socket.emit('webrtc-offer', {
+          socket.emit('offer', {
             offer,
             callSessionId: activeCall.callSessionId,
             from: socket.id
           });
           console.log(`[WebRTC] Offer sent to ${remoteSocketId}`);
         } else {
-          console.log(`[WebRTC] Not an initiator, waiting for offer`);
+          console.log(`[WebRTC] Not an initiator, waiting for offer from ${remoteSocketId}`);
         }
 
         return peerConnection;
@@ -579,7 +632,7 @@ export const useCallState = (socket: Socket | null) => {
         throw err;
       }
     },
-    [socket, activeCall, localStream]
+    [socket, activeCall, localStream, user]
   );
 
   // Handle WebRTC offer
@@ -604,7 +657,7 @@ export const useCallState = (socket: Socket | null) => {
 
           if (socket && activeCall) {
             console.log(`[WebRTC] Sending answer back to ${from}`);
-            socket.emit('webrtc-answer', {
+            socket.emit('answer', {
               answer,
               callSessionId: activeCall.callSessionId,
               from: socket.id
