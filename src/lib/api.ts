@@ -16,6 +16,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+
+    
     if (!response.ok) throw new Error('Registration failed');
     const result = await response.json();
     console.log('register:', result);
