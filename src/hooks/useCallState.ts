@@ -3,6 +3,12 @@ import { Socket } from 'socket.io-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+// Media stream state
+export interface MediaStreams {
+  localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
+}
+
 export interface IncomingCallData {
   callSessionId: string;
   callerId: string;
@@ -43,10 +49,13 @@ export const useCallState = (socket: Socket | null) => {
   const [activeCall, setActiveCall] = useState<ActiveCallData | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [isUserOnline, setIsUserOnline] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
   const outgoingCallTimerRef = useRef<NodeJS.Timeout | null>(null);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const ringbackRef = useRef<HTMLAudioElement | null>(null);
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
 
   // Initialize ringtone and ringback audio elements
   useEffect(() => {
@@ -241,6 +250,22 @@ export const useCallState = (socket: Socket | null) => {
       setIsUserOnline(true);
     });
 
+    // WebRTC signaling listeners
+    socket.on('webrtc-offer', async (data: { offer: RTCSessionDescriptionInit; from: string }) => {
+      console.log('Received WebRTC offer from:', data.from);
+      await handleWebRTCOffer(data.offer, data.from);
+    });
+
+    socket.on('webrtc-answer', async (data: { answer: RTCSessionDescriptionInit; from: string }) => {
+      console.log('Received WebRTC answer from:', data.from);
+      await handleWebRTCAnswer(data.answer, data.from);
+    });
+
+    socket.on('ice-candidate', async (data: { candidate: RTCIceCandidateInit; from: string }) => {
+      console.log('Received ICE candidate from:', data.from);
+      await handleICECandidate(data.candidate, data.from);
+    });
+
     return () => {
       socket.off('incoming-call');
       socket.off('call-accepted');
@@ -254,8 +279,43 @@ export const useCallState = (socket: Socket | null) => {
       socket.off('user-disconnected-during-call');
       socket.off('disconnect');
       socket.off('connect');
+      socket.off('webrtc-offer');
+      socket.off('webrtc-answer');
+      socket.off('ice-candidate');
     };
   }, [socket, user, outgoingCall, incomingCall]);
+
+  // Get media stream for call
+  const getMediaStream = useCallback(async (callType: 'voice' | 'video') => {
+    try {
+      const constraints = {
+        audio: true,
+        video: callType === 'video' ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setLocalStream(stream);
+      return stream;
+    } catch (error) {
+      console.error('Error getting media stream:', error);
+      toast({
+        title: 'Error',
+        description: 'Unable to access microphone' + (callType === 'video' ? ' and camera' : ''),
+        variant: 'destructive'
+      });
+      throw error;
+    }
+  }, [toast]);
+
+  // Stop media stream
+  const stopMediaStream = useCallback(() => {
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        track.stop();
+      });
+      setLocalStream(null);
+    }
+  }, [localStream]);
 
   // Sound control functions
   const playRingtone = useCallback(() => {
@@ -293,60 +353,76 @@ export const useCallState = (socket: Socket | null) => {
 
   // Initiate call
   const initiateCall = useCallback(
-    (recipientId: string, recipientName: string, callType: 'voice' | 'video') => {
+    async (recipientId: string, recipientName: string, callType: 'voice' | 'video') => {
       if (!socket) return;
 
-      socket.emit('initiate-call', {
-        recipientId,
-        callType,
-      });
+      try {
+        // Get media stream before initiating call
+        await getMediaStream(callType);
 
-      setOutgoingCall({
-        recipientId,
-        recipientName,
-        callType,
-      });
-
-      playRingbackTone();
-
-      // Set 30-second timeout for call
-      const timer = setTimeout(() => {
-        // Auto-cancel if no response (don't reference stale outgoingCall)
-        socket.emit('cancel-call', {
+        socket.emit('initiate-call', {
           recipientId,
-          callSessionId: undefined,
+          callType,
         });
-        setOutgoingCall(null);
-        stopRingbackTone();
-        toast({
-          title: 'No Answer',
-          description: 'The call was not answered',
-          variant: 'destructive',
-        });
-      }, 30000); // 30 seconds
 
-      outgoingCallTimerRef.current = timer;
+        setOutgoingCall({
+          recipientId,
+          recipientName,
+          callType,
+        });
+
+        playRingbackTone();
+
+        // Set 30-second timeout for call
+        const timer = setTimeout(() => {
+          // Auto-cancel if no response (don't reference stale outgoingCall)
+          socket.emit('cancel-call', {
+            recipientId,
+            callSessionId: undefined,
+          });
+          setOutgoingCall(null);
+          stopRingbackTone();
+          stopMediaStream();
+          toast({
+            title: 'No Answer',
+            description: 'The call was not answered',
+            variant: 'destructive',
+          });
+        }, 30000); // 30 seconds
+
+        outgoingCallTimerRef.current = timer;
+      } catch (error) {
+        console.error('Error initiating call:', error);
+        setOutgoingCall(null);
+      }
     },
-    [socket, playRingbackTone, stopRingbackTone, toast]
+    [socket, playRingbackTone, stopRingbackTone, toast, getMediaStream, stopMediaStream]
   );
 
   // Accept incoming call
-  const acceptCall = useCallback(() => {
+  const acceptCall = useCallback(async () => {
     if (!socket || !incomingCall) return;
 
-    // Clear any pending outgoing call timeout
-    if (outgoingCallTimerRef.current) {
-      clearTimeout(outgoingCallTimerRef.current);
-      outgoingCallTimerRef.current = null;
+    try {
+      // Get media stream based on call type
+      await getMediaStream(incomingCall.callType);
+
+      // Clear any pending outgoing call timeout
+      if (outgoingCallTimerRef.current) {
+        clearTimeout(outgoingCallTimerRef.current);
+        outgoingCallTimerRef.current = null;
+      }
+
+      socket.emit('accept-call', {
+        callSessionId: incomingCall.callSessionId,
+        recipientId: incomingCall.callerId,
+      });
+
+      stopRingtone();
+    } catch (error) {
+      console.error('Error accepting call:', error);
     }
-
-    socket.emit('accept-call', {
-      callSessionId: incomingCall.callSessionId,
-      recipientId: incomingCall.callerId,
-    });
-
-    stopRingtone();
-  }, [socket, incomingCall, stopRingtone]);
+  }, [socket, incomingCall, stopRingtone, getMediaStream]);
 
   // Reject incoming call
   const rejectCall = useCallback(() => {
@@ -384,6 +460,160 @@ export const useCallState = (socket: Socket | null) => {
     }
   }, [socket, outgoingCall, stopRingbackTone]);
 
+  // Create peer connection
+  const createPeerConnection = useCallback(
+    async (remoteSocketId: string, isInitiator: boolean) => {
+      try {
+        const peerConnection = new RTCPeerConnection({
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        });
+
+        // Add local stream tracks
+        if (localStream) {
+          localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+          });
+        }
+
+        // Handle incoming remote stream
+        peerConnection.ontrack = (event) => {
+          console.log('Remote track received from:', remoteSocketId);
+          if (event.streams && event.streams[0]) {
+            setRemoteStreams(prev => new Map(prev).set(remoteSocketId, event.streams[0]));
+          }
+        };
+
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+          if (event.candidate && socket) {
+            socket.emit('ice-candidate', {
+              candidate: event.candidate,
+              to: remoteSocketId,
+              from: socket.id,
+              callSessionId: activeCall?.callSessionId
+            });
+          }
+        };
+
+        // Monitor connection state
+        peerConnection.onconnectionstatechange = () => {
+          console.log(`Connection state with ${remoteSocketId}:`, peerConnection.connectionState);
+          if (peerConnection.connectionState === 'failed') {
+            console.error('Connection failed');
+            peerConnection.restartIce();
+          }
+        };
+
+        peerConnectionsRef.current.set(remoteSocketId, peerConnection);
+
+        // If initiator, create and send offer
+        if (isInitiator && socket && activeCall) {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+
+          socket.emit('webrtc-offer', {
+            offer,
+            callSessionId: activeCall.callSessionId,
+            from: socket.id
+          });
+          console.log('WebRTC offer sent to:', remoteSocketId);
+        }
+
+        return peerConnection;
+      } catch (err) {
+        console.error('Error creating peer connection:', err);
+        throw err;
+      }
+    },
+    [socket, activeCall, localStream]
+  );
+
+  // Handle WebRTC offer
+  const handleWebRTCOffer = useCallback(
+    async (offer: RTCSessionDescriptionInit, from: string) => {
+      try {
+        let peerConnection = peerConnectionsRef.current.get(from);
+
+        if (!peerConnection) {
+          peerConnection = await createPeerConnection(from, false);
+        }
+
+        if (peerConnection) {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+
+          if (socket && activeCall) {
+            socket.emit('webrtc-answer', {
+              answer,
+              callSessionId: activeCall.callSessionId,
+              from: socket.id
+            });
+          }
+
+          console.log('WebRTC answer sent to:', from);
+        }
+      } catch (err) {
+        console.error('Error handling WebRTC offer:', err);
+      }
+    },
+    [socket, activeCall, createPeerConnection]
+  );
+
+  // Handle WebRTC answer
+  const handleWebRTCAnswer = useCallback(
+    async (answer: RTCSessionDescriptionInit, from: string) => {
+      try {
+        const peerConnection = peerConnectionsRef.current.get(from);
+        if (peerConnection) {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+          console.log('Remote description set for:', from);
+        }
+      } catch (err) {
+        console.error('Error handling WebRTC answer:', err);
+      }
+    },
+    []
+  );
+
+  // Handle ICE candidate
+  const handleICECandidate = useCallback(
+    async (candidate: RTCIceCandidateInit, from: string) => {
+      try {
+        const peerConnection = peerConnectionsRef.current.get(from);
+        if (peerConnection && candidate) {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (err) {
+        console.error('Error adding ICE candidate:', err);
+      }
+    },
+    []
+  );
+
+  // Clean up peer connections
+  const cleanupPeerConnections = useCallback(() => {
+    peerConnectionsRef.current.forEach(pc => {
+      pc.close();
+    });
+    peerConnectionsRef.current.clear();
+    setRemoteStreams(new Map());
+  }, []);
+
+  // Cleanup on unmount or when call ends
+  useEffect(() => {
+    return () => {
+      if (!activeCall && !incomingCall && !outgoingCall) {
+        stopMediaStream();
+        cleanupPeerConnections();
+      }
+    };
+  }, [activeCall, incomingCall, outgoingCall, stopMediaStream, cleanupPeerConnections]);
+
   // End active call
   const endCall = useCallback(() => {
     if (!socket || !activeCall) return;
@@ -400,7 +630,9 @@ export const useCallState = (socket: Socket | null) => {
 
     setActiveCall(null);
     stopAllSounds();
-  }, [socket, activeCall, stopAllSounds]);
+    stopMediaStream();
+    cleanupPeerConnections();
+  }, [socket, activeCall, stopAllSounds, stopMediaStream, cleanupPeerConnections]);
 
   return {
     incomingCall,
@@ -414,5 +646,14 @@ export const useCallState = (socket: Socket | null) => {
     cancelCall,
     endCall,
     stopAllSounds,
+    localStream,
+    remoteStreams,
+    getMediaStream,
+    stopMediaStream,
+    createPeerConnection,
+    handleWebRTCOffer,
+    handleWebRTCAnswer,
+    handleICECandidate,
+    cleanupPeerConnections,
   };
 };

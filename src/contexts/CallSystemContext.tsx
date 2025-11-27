@@ -10,12 +10,16 @@ interface CallContextType {
   activeCall: ActiveCallData | null;
   onlineUsers: OnlineUser[];
   isUserOnline: boolean;
-  initiateCall: (recipientId: string, recipientName: string, callType: 'voice' | 'video') => void;
-  acceptCall: () => void;
+  localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
+  initiateCall: (recipientId: string, recipientName: string, callType: 'voice' | 'video') => Promise<void>;
+  acceptCall: () => Promise<void>;
   rejectCall: () => void;
   cancelCall: () => void;
   endCall: () => void;
   stopAllSounds: () => void;
+  getMediaStream: (callType: 'voice' | 'video') => Promise<MediaStream>;
+  stopMediaStream: () => void;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);

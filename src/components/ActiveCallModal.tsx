@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -7,11 +7,19 @@ import { ActiveCallData } from '@/hooks/useCallState';
 
 interface ActiveCallModalProps {
   activeCall: ActiveCallData | null;
+  localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
   onEndCall: () => void;
 }
 
-export const ActiveCallModal = ({ activeCall, onEndCall }: ActiveCallModalProps) => {
+export const ActiveCallModal = ({
+  activeCall,
+  localStream,
+  remoteStreams,
+  onEndCall,
+}: ActiveCallModalProps) => {
   const [duration, setDuration] = useState(0);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (!activeCall) return;
@@ -22,6 +30,16 @@ export const ActiveCallModal = ({ activeCall, onEndCall }: ActiveCallModalProps)
 
     return () => clearInterval(timer);
   }, [activeCall]);
+
+  // Get the first remote stream (in case of multiple participants)
+  const remoteStream = remoteStreams.size > 0 ? Array.from(remoteStreams.values())[0] : null;
+
+  // Attach remote stream to video element if video call
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream && activeCall?.callType === 'video') {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, activeCall?.callType]);
 
   if (!activeCall) return null;
 
@@ -50,12 +68,26 @@ export const ActiveCallModal = ({ activeCall, onEndCall }: ActiveCallModalProps)
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-6 py-8">
-          {/* Participant Avatar */}
-          <Avatar className="h-24 w-24 border-4 border-green-500">
-            <AvatarFallback className="text-xl font-bold bg-gradient-to-br from-green-400 to-green-600 text-white">
-              {getInitials(activeCall.participantName)}
-            </AvatarFallback>
-          </Avatar>
+          {/* Video Stream for Video Calls */}
+          {activeCall.callType === 'video' && remoteStream ? (
+            <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <>
+              {/* Participant Avatar for Voice Calls */}
+              <Avatar className="h-24 w-24 border-4 border-green-500">
+                <AvatarFallback className="text-xl font-bold bg-gradient-to-br from-green-400 to-green-600 text-white">
+                  {getInitials(activeCall.participantName)}
+                </AvatarFallback>
+              </Avatar>
+            </>
+          )}
 
           {/* Participant Name */}
           <div className="text-center">
