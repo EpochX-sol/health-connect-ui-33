@@ -66,7 +66,7 @@ const DoctorLayout = () => {
                   <Stethoscope className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1 group-data-[collapsible=icon]:hidden">
-                  <h1 className="text-lg font-bold text-sidebar-foreground">TeleHealth</h1>
+                  <h1 className="text-lg font-bold text-sidebar-foreground">MedLink</h1>
                   <p className="text-xs text-sidebar-foreground/70">Doctor Portal</p>
                 </div>
               </div>

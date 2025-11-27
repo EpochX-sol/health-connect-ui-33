@@ -4,6 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { CallSystemProvider, useCallSystem } from "./contexts/CallSystemContext";
+import IncomingCallModal from "./components/IncomingCallModal";
+import OutgoingCallModal from "./components/OutgoingCallModal";
+import RootRedirect from "./components/RootRedirect";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import RegisterPatient from "./pages/RegisterPatient";
@@ -30,56 +34,80 @@ import DoctorPayment from "./pages/doctor/Payment";
 import NotFound from "./pages/NotFound";
 import AppointmentDetail from "./pages/AppointmentDetail";
 import DoctorProfilePage from "./pages/DoctorProfile";
+import { RequireRole } from "@/components/RequireRole";
 
 const queryClient = new QueryClient();
+
+// Component to show call modals
+const AppContent = () => {
+  const { incomingCall, outgoingCall, acceptCall, rejectCall, cancelCall } = useCallSystem();
+
+  return (
+    <>
+      <IncomingCallModal incomingCall={incomingCall} onAccept={acceptCall} onReject={rejectCall} />
+      <OutgoingCallModal outgoingCall={outgoingCall} onCancel={cancelCall} />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<><RootRedirect /><Index /></>} />
+          <Route path="/login" element={<Login />} />
+        <Route path="/register/patient" element={<RegisterPatient />} />
+        <Route path="/register/doctor" element={<RegisterDoctor />} />
+        
+        {/* Admin Routes */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index path="dashboard" element={<AdminDashboard />} />
+        </Route>
+          
+          <Route path="/patient" element={
+            <RequireRole role="patient">
+              <PatientLayout />
+            </RequireRole>
+          }>
+            <Route path="dashboard" element={<PatientDashboard />} />
+            <Route path="profile" element={<PatientProfile />} />
+            <Route path="appointments" element={<PatientAppointments />} />
+            <Route path="appointment/:id" element={<AppointmentDetail />} />
+            <Route path="doctor-profile/:id" element={<DoctorProfilePage />} />
+            <Route path="book-appointment" element={<BookAppointment />} />
+            <Route path="payment" element={<PatientPayment />} />
+            <Route path="payment-status" element={<PatientPaymentStatus />} />
+            <Route path="messages" element={<PatientMessages />} />
+            <Route path="prescriptions" element={<PatientPrescriptions />} />
+          </Route>
+
+          <Route path="/doctor" element={
+            <RequireRole role="doctor">
+              <DoctorLayout />
+            </RequireRole>
+          }>
+            <Route path="dashboard" element={<DoctorDashboard />} />
+            <Route path="profile" element={<DoctorProfile />} />
+            <Route path="appointments" element={<DoctorAppointments />} />
+            <Route path="appointment/:id" element={<AppointmentDetail />} />
+            <Route path="patients" element={<DoctorPatients />} />
+            <Route path="prescriptions" element={<DoctorPrescriptions />} />
+            <Route path="messages" element={<DoctorMessages />} />
+            <Route path="payment" element={<DoctorPayment />} />
+          </Route>
+
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-          <Route path="/register/patient" element={<RegisterPatient />} />
-          <Route path="/register/doctor" element={<RegisterDoctor />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-          </Route>
-            
-            <Route path="/patient" element={<PatientLayout />}>
-              <Route path="dashboard" element={<PatientDashboard />} />
-              <Route path="profile" element={<PatientProfile />} />
-              <Route path="appointments" element={<PatientAppointments />} />
-              <Route path="appointment/:id" element={<AppointmentDetail />} />
-              <Route path="doctor-profile/:id" element={<DoctorProfilePage />} />
-              <Route path="book-appointment" element={<BookAppointment />} />
-              <Route path="payment" element={<PatientPayment />} />
-              <Route path="payment-status" element={<PatientPaymentStatus />} />
-              <Route path="messages" element={<PatientMessages />} />
-              <Route path="prescriptions" element={<PatientPrescriptions />} />
-            </Route>
-
-            <Route path="/doctor" element={<DoctorLayout />}>
-              <Route path="dashboard" element={<DoctorDashboard />} />
-              <Route path="profile" element={<DoctorProfile />} />
-              <Route path="appointments" element={<DoctorAppointments />} />
-              <Route path="appointment/:id" element={<AppointmentDetail />} />
-              <Route path="patients" element={<DoctorPatients />} />
-              <Route path="prescriptions" element={<DoctorPrescriptions />} />
-              <Route path="messages" element={<DoctorMessages />} />
-              <Route path="payment" element={<DoctorPayment />} />
-            </Route>
-
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <CallSystemProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppContent />
+        </TooltipProvider>
+      </CallSystemProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

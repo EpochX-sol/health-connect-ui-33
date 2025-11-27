@@ -12,8 +12,8 @@ const Index = () => {
               <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
                 <Activity className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                TeleHealth
+              <span className="text-xlfont-bold bg-gradient-primary bg-clip-text text-transparent text-white">
+                MedLink
               </span>
             </div>
             <div className="flex gap-3">
@@ -33,7 +33,7 @@ const Index = () => {
           <div className="max-w-7xl mx-auto text-center">
             <h1 className="text-5xl sm:text-6xl font-bold text-foreground mb-6">
               Quality Healthcare,{' '}
-              <span className="bg-gradient-primary bg-clip-text text-transparent">
+              <span className="bg-gradient-primary bg-clip-text text-transparent text-white">
                 Anytime, Anywhere
               </span>
             </h1>
@@ -57,7 +57,7 @@ const Index = () => {
 
         <section className="py-20 px-4 sm:px-6 lg:px-8 bg-card/50">
           <div className="max-w-7xl mx-auto">
-            <h2 className="text-3xl font-bold text-center mb-12">Why Choose TeleHealth?</h2>
+            <h2 className="text-3xl font-bold text-center mb-12">Why Choose MedLink?</h2>
             <div className="grid md:grid-cols-3 gap-8">
               <div className="text-center p-6">
                 <div className="w-16 h-16 rounded-full bg-gradient-primary mx-auto mb-4 flex items-center justify-center">
@@ -110,7 +110,7 @@ const Index = () => {
 
       <footer className="border-t bg-card py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center text-muted-foreground">
-          <p>&copy; 2025 TeleHealth. All rights reserved.</p>
+          <p>&copy; 2025 MedLink. All rights reserved.</p>
         </div>
       </footer>
     </div>

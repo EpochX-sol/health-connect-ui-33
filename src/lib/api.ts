@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://proj-babi.onrender.com/api';
 
 export const api = {
     getMessagesByUser: async (userId: string, token?: string) => {
@@ -229,9 +229,8 @@ export const api = {
   },
 
   getAppointments: async (token?: string) => {
-    const headers: any = { 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    
+    const headers: any = { 'Content-Type': 'application/json' }; 
+    console.log('getAppointments called with token:',API_BASE_URL)
     const response = await fetch(`${API_BASE_URL}/appointments`, { headers });
     if (!response.ok) throw new Error('Failed to fetch appointments');
     const result = await response.json();
@@ -310,6 +309,21 @@ export const api = {
     if (!response.ok) throw new Error('Failed to update notes');
     const result = await response.json();
     console.log('updateAppointmentNotes:', result);
+    return result;
+  },
+
+  updateAppointmentStatus: async (id: string, status: 'booked' | 'completed' | 'cancelled', token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) throw new Error('Failed to update appointment status');
+    const result = await response.json();
+    console.log('updateAppointmentStatus:', result);
     return result;
   },
 
@@ -489,8 +503,8 @@ export const api = {
     const headers: any = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
     
-    const response = await fetch(`${API_BASE_URL}/payments/validate?tx_ref=${tx_ref}`, { headers });
-    if (!response.ok) throw new Error('Failed to validate payment');
+    const response = await fetch(`${API_BASE_URL}/payments/verify?tx_ref=${tx_ref}`, { headers });
+    if (!response.ok) throw new Error('Failed to verify payment');
     const result = await response.json();
     console.log('validatePayment:', result);
     return result;
@@ -504,6 +518,17 @@ export const api = {
     if (!response.ok) throw new Error('Failed to fetch payment');
     const result = await response.json();
     console.log('getPaymentById:', result);
+    return result;
+  },
+
+  getPayments: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/payments`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch payments');
+    const result = await response.json();
+    console.log('getPayments:', result);
     return result;
   },
 
@@ -540,4 +565,154 @@ export const api = {
     console.log('healthCheck:', result);
     return result;
   },
+  
+  // ============= NEW ADMIN APIs =============
+  
+  // Admin Stats
+  getAdminStats: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/stats`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch admin stats');
+    return await response.json();
+  },
+
+  // Admin Doctor Management
+  getAllDoctorProfiles: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/doctor-profiles`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch doctor profiles');
+    return await response.json();
+  },
+
+  approveDoctor: async (doctorId: string, note: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}/approve`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ note }),
+    });
+    if (!response.ok) throw new Error('Failed to approve doctor');
+    return await response.json();
+  },
+
+  rejectDoctor: async (doctorId: string, note: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}/reject`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ note }),
+    });
+    if (!response.ok) throw new Error('Failed to reject doctor');
+    return await response.json();
+  },
+
+  setDoctorRate: async (doctorId: string, pricePerHour: number, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}/rate`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ pricePerHour }),
+    });
+    if (!response.ok) throw new Error('Failed to set doctor rate');
+    return await response.json();
+  },
+
+  editDoctorProfile: async (doctorId: string, data: any, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}/edit`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to edit doctor profile');
+    return await response.json();
+  },
+
+  // Admin User Management
+  getAdminUsers: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/users`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch users');
+    return await response.json();
+  },
+
+  updateAdminUser: async (userId: string, data: any, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to update user');
+    return await response.json();
+  },
+
+  deleteAdminUser: async (userId: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!response.ok) throw new Error('Failed to delete user');
+    return await response.json();
+  },
+
+  getAllPatients: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/patients`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch patients');
+    return await response.json();
+  },
+
+  getAdminDoctors: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/doctors`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch doctors');
+    return await response.json();
+  },
+
+  // Admin Financial Management
+  getWithdrawalRequests: async (token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/withdrawals`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch withdrawal requests');
+    return await response.json();
+  },
+
+  approveWithdrawal: async (withdrawalId: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/withdrawals/${withdrawalId}/approve`, {
+      method: 'PUT',
+      headers,
+    });
+    if (!response.ok) throw new Error('Failed to approve withdrawal');
+    return await response.json();
+  },
+
+  rejectWithdrawal: async (withdrawalId: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/admin/withdrawals/${withdrawalId}/reject`, {
+      method: 'PUT',
+      headers,
+    });
+    if (!response.ok) throw new Error('Failed to reject withdrawal');
+    return await response.json();
+  },
+
 };
+
+

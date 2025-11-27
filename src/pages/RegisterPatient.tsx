@@ -77,8 +77,8 @@ const RegisterPatient = () => {
             <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center">
               <Activity className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              TeleHealth
+            <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent text-white">
+              MedLink
             </span>
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Patient Registration</h1>
@@ -97,7 +97,7 @@ const RegisterPatient = () => {
                 <Input
                   id="name"
                   type="text"
-                  placeholder="John Doe"
+                  placeholder="Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required

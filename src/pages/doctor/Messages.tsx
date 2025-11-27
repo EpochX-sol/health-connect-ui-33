@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallSystem } from '@/contexts/CallSystemContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,15 +12,15 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { Message, Appointment } from '@/types';
-import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video, User } from 'lucide-react';
+import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { CallModal } from '@/components/CallModal';
 
 const DoctorMessages = () => {
   const { user, token } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { initiateCall } = useCallSystem();
   const [searchParams] = useSearchParams();
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -31,10 +32,9 @@ const DoctorMessages = () => {
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [patientNames, setPatientNames] = useState<Record<string, string>>({});
-  const [isCallOpen, setIsCallOpen] = useState(false);
-  const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [directMessageMode, setDirectMessageMode] = useState(false);
   const [directMessages, setDirectMessages] = useState<Message[]>([]);
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -209,7 +209,7 @@ const DoctorMessages = () => {
 
   return (
     <div className="space-y-6 animate-fade-in"> 
-      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-150px)]">
+      <div className="hidden md:grid md:grid-cols-3 gap-6 h-[calc(100vh-150px)]">
         {/* Conversations List */}
         {!directMessageMode ? (
         <Card className="lg:col-span-1">
@@ -304,7 +304,6 @@ const DoctorMessages = () => {
                       <CardTitle className="text-lg">
                         {patientNames[selectedPatientId] || 'Unknown Patient'}
                       </CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">Patient</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -312,8 +311,9 @@ const DoctorMessages = () => {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        setCallType('voice');
-                        setIsCallOpen(true);
+                        if (selectedPatientId) {
+                          initiateCall(selectedPatientId, patientNames[selectedPatientId] || 'Patient', 'voice');
+                        }
                       }}
                       className="hover:bg-primary hover:text-primary-foreground"
                     >
@@ -323,8 +323,9 @@ const DoctorMessages = () => {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        setCallType('video');
-                        setIsCallOpen(true);
+                        if (selectedPatientId) {
+                          initiateCall(selectedPatientId, patientNames[selectedPatientId] || 'Patient', 'video');
+                        }
                       }}
                       className="hover:bg-primary hover:text-primary-foreground"
                     >
@@ -432,15 +433,231 @@ const DoctorMessages = () => {
         </Card>
       </div>
 
-      <CallModal
-        isOpen={isCallOpen}
-        onClose={() => setIsCallOpen(false)}
-        isVideoCall={callType === 'video'}
-        participantName={patientNames[selectedPatientId || ''] || 'Patient'}
-        participantInitials={selectedPatientId
-          ? getInitials(patientNames[selectedPatientId] || 'P')
-          : 'P'}
-      />
+      {/* Mobile view - Show conversation list */}
+      <div className="md:hidden h-[calc(100vh-150px)]">
+        {!showMobileChat ? (
+          <Card className="h-full flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
+              <CardTitle className="text-lg">Conversations</CardTitle>
+              <div className="relative mt-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search patients..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardHeader>
+            <Separator />
+            <ScrollArea className="flex-1 min-h-0">
+              {loading ? (
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-16 bg-muted rounded-lg"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : patientIds.filter(id => patientNames[id]?.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 ? (
+                <div className="p-2">
+                  {patientIds
+                    .sort((id1, id2) => {
+                      const messages1 = messages.filter(m => (m.receiver_id === id1 || m.sender_id === id1));
+                      const messages2 = messages.filter(m => (m.receiver_id === id2 || m.sender_id === id2));
+                      
+                      const lastMessage1 = messages1[messages1.length - 1];
+                      const lastMessage2 = messages2[messages2.length - 1];
+                      
+                      const time1 = lastMessage1 ? new Date(lastMessage1.timestamp).getTime() : 0;
+                      const time2 = lastMessage2 ? new Date(lastMessage2.timestamp).getTime() : 0;
+                      
+                      return time2 - time1;
+                    })
+                    .filter(id => patientNames[id]?.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((patientId) => {
+                      const patientName = patientNames[patientId] || 'Unknown Patient';
+                      const patientMessages = messages.filter(m => (m.receiver_id === patientId || m.sender_id === patientId));
+                      const lastMessage = patientMessages[patientMessages.length - 1];
+                      
+                      return (
+                        <button
+                          key={patientId}
+                          onClick={() => {
+                            setSelectedPatientId(patientId);
+                            setShowMobileChat(true);
+                          }}
+                          className={cn(
+                            "w-full p-3 rounded-lg text-left transition-all hover:bg-accent/50 mb-2",
+                            "bg-primary/10 border border-primary/50"
+                          )}
+                        >
+                          <div className="flex gap-3">
+                            <Avatar className="h-12 w-12 border-2 border-background">
+                              <AvatarFallback className="bg-gradient-secondary text-secondary-foreground">
+                                {getInitials(patientName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="font-semibold text-sm truncate">
+                                  {patientName}
+                                </p>
+                                {lastMessage && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(lastMessage.timestamp), 'MMM dd')}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {lastMessage?.content || 'No messages yet'}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No conversations found</p>
+                </div>
+              )}
+            </ScrollArea>
+          </Card>
+        ) : (
+          <Card className="flex flex-col h-full overflow-hidden">
+            <CardHeader className="border-b flex-shrink-0">
+              <div className="flex items-center justify-between gap-3">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setShowMobileChat(false)}
+                  className="flex-shrink-0"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Button>
+                <div className="flex-1">
+                  <CardTitle className="text-lg">
+                    {patientNames[selectedPatientId || ''] || 'Patient'}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">Patient</p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      if (selectedPatientId) {
+                        initiateCall(selectedPatientId, patientNames[selectedPatientId] || 'Patient', 'voice');
+                      }
+                    }}
+                    className="hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <Phone className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      if (selectedPatientId) {
+                        initiateCall(selectedPatientId, patientNames[selectedPatientId] || 'Patient', 'video');
+                      }
+                    }}
+                    className="hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <Video className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+              <div className="space-y-4 p-4">
+                {(directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedPatientId || m.sender_id === selectedPatientId))).length > 0 ? (
+                  (directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedPatientId || m.sender_id === selectedPatientId))).map((message) => {
+                    const isOwn = message.sender_id === user?._id;
+                    return (
+                      <div
+                        key={message._id}
+                        className={cn(
+                          "flex gap-3",
+                          isOwn ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        {!isOwn && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-gradient-secondary text-secondary-foreground text-xs">
+                              Pt
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div
+                          className={cn(
+                            "max-w-[70%] rounded-2xl px-4 py-2",
+                            isOwn
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-foreground"
+                          )}
+                        >
+                          <p className="text-sm">{message.content}</p>
+                          <p
+                            className={cn(
+                              "text-xs mt-1",
+                              isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                            )}
+                          >
+                            {format(new Date(message.timestamp), 'HH:mm')}
+                          </p>
+                        </div>
+                        {isOwn && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-gradient-primary text-primary-foreground text-xs">
+                              {getInitials(user?.name || 'U')}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-12">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">No messages yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Start the conversation with your patient
+                    </p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t flex-shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+                className="flex gap-2"
+              >
+                <Input
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Type your message..."
+                  disabled={sending}
+                  className="flex-1"
+                />
+                <Button type="submit" disabled={sending || !messageText.trim()} className="gap-2 px-3">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

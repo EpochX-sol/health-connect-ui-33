@@ -1,6 +1,6 @@
 import { User } from '@/types';
 
-const AUTH_STORAGE_KEY = 'telehealth_auth';
+const AUTH_STORAGE_KEY = 'MedLink_auth';
 
 export interface AuthData {
   user: User;

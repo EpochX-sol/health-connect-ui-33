@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallSystem } from '@/contexts/CallSystemContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,15 +12,15 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { Message, Appointment } from '@/types';
-import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video, User } from 'lucide-react';
+import { Send, MessageSquare, Clock, Stethoscope, Search, Phone, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { CallModal } from '@/components/CallModal';
 
 const PatientMessages = () => {
   const { user, token } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { initiateCall } = useCallSystem();
   const [searchParams] = useSearchParams();
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -31,10 +32,9 @@ const PatientMessages = () => {
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
-  const [isCallOpen, setIsCallOpen] = useState(false);
-  const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [directMessageMode, setDirectMessageMode] = useState(false);
   const [directMessages, setDirectMessages] = useState<Message[]>([]);
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -208,15 +208,9 @@ const PatientMessages = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Messages</h1>
-        <p className="text-muted-foreground mt-2">
-          Communicate with your doctors
-        </p>
-      </div>
+    <div className="space-y-6 animate-fade-in"> 
 
-      <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
+      <div className="hidden md:grid md:grid-cols-3 gap-6 h-[calc(100vh-150px)]">
         {/* Conversations List */}
         {!directMessageMode ? (
         <Card className="lg:col-span-1">
@@ -268,7 +262,7 @@ const PatientMessages = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <p className="font-semibold text-sm truncate">
-                              Dr. {doctorName}
+                              {doctorName}
                             </p>
                             {lastMessage && (
                               <span className="text-xs text-muted-foreground">
@@ -309,31 +303,18 @@ const PatientMessages = () => {
                     </Avatar>
                     <div className="flex-1">
                       <CardTitle className="text-lg">
-                        <Link 
-                          to={`/patient/doctor-profile/${selectedDoctorId}`}
-                          className="hover:text-primary transition-colors hover:underline"
-                        >
-                          Dr. {doctorNames[selectedDoctorId] || 'Unknown Doctor'}
-                        </Link>
+                        {doctorNames[selectedDoctorId] || 'Unknown Doctor'}
                       </CardTitle>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       size="icon"
-                      variant="outline"
-                      onClick={() => navigate(`/patient/doctor-profile/${selectedDoctorId}`)}
-                      title="View doctor profile"
-                      className="hover:bg-secondary hover:text-secondary-foreground"
-                    >
-                      <User className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      size="icon"
                       variant="ghost"
                       onClick={() => {
-                        setCallType('voice');
-                        setIsCallOpen(true);
+                        if (selectedDoctorId) {
+                          initiateCall(selectedDoctorId, doctorNames[selectedDoctorId] || 'Doctor', 'voice');
+                        }
                       }}
                       className="hover:bg-primary hover:text-primary-foreground"
                     >
@@ -343,8 +324,9 @@ const PatientMessages = () => {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        setCallType('video');
-                        setIsCallOpen(true);
+                        if (selectedDoctorId) {
+                          initiateCall(selectedDoctorId, doctorNames[selectedDoctorId] || 'Doctor', 'video');
+                        }
                       }}
                       className="hover:bg-primary hover:text-primary-foreground"
                     >
@@ -452,15 +434,230 @@ const PatientMessages = () => {
         </Card>
       </div>
 
-      <CallModal
-        isOpen={isCallOpen}
-        onClose={() => setIsCallOpen(false)}
-        isVideoCall={callType === 'video'}
-        participantName={doctorNames[selectedDoctorId || ''] || 'Doctor'}
-        participantInitials={selectedDoctorId
-          ? getInitials(doctorNames[selectedDoctorId] || 'D')
-          : 'D'}
-      />
+      {/* Mobile view - Show conversation list */}
+      <div className="md:hidden h-[calc(100vh-150px)]">
+        {!showMobileChat ? (
+          <Card className="h-full flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
+              <CardTitle className="text-lg">Conversations</CardTitle>
+              <div className="relative mt-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search doctors..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardHeader>
+            <Separator />
+            <ScrollArea className="flex-1 min-h-0">
+              {loading ? (
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-16 bg-muted rounded-lg"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : doctorIds.filter(id => doctorNames[id]?.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 ? (
+                <div className="p-2">
+                  {doctorIds
+                    .sort((id1, id2) => {
+                      const messages1 = messages.filter(m => (m.receiver_id === id1 || m.sender_id === id1));
+                      const messages2 = messages.filter(m => (m.receiver_id === id2 || m.sender_id === id2));
+                      
+                      const lastMessage1 = messages1[messages1.length - 1];
+                      const lastMessage2 = messages2[messages2.length - 1];
+                      
+                      const time1 = lastMessage1 ? new Date(lastMessage1.timestamp).getTime() : 0;
+                      const time2 = lastMessage2 ? new Date(lastMessage2.timestamp).getTime() : 0;
+                      
+                      return time2 - time1;
+                    })
+                    .filter(id => doctorNames[id]?.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((doctorId) => {
+                      const doctorName = doctorNames[doctorId] || 'Unknown Doctor';
+                      const doctorMessages = messages.filter(m => (m.receiver_id === doctorId || m.sender_id === doctorId));
+                      const lastMessage = doctorMessages[doctorMessages.length - 1];
+                      
+                      return (
+                        <button
+                          key={doctorId}
+                          onClick={() => {
+                            setSelectedDoctorId(doctorId);
+                            setShowMobileChat(true);
+                          }}
+                          className={cn(
+                            "w-full p-3 rounded-lg text-left transition-all hover:bg-accent/50 mb-2",
+                            "bg-primary/10 border border-primary/50"
+                          )}
+                        >
+                          <div className="flex gap-3">
+                            <Avatar className="h-12 w-12 border-2 border-background">
+                              <AvatarFallback className="bg-gradient-secondary text-secondary-foreground">
+                                {getInitials(doctorName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="font-semibold text-sm truncate">
+                                  {doctorName}
+                                </p>
+                                {lastMessage && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(lastMessage.timestamp), 'MMM dd')}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {lastMessage?.content || 'No messages yet'}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No conversations found</p>
+                </div>
+              )}
+            </ScrollArea>
+          </Card>
+        ) : (
+          <Card className="flex flex-col h-full overflow-hidden">
+            <CardHeader className="border-b flex-shrink-0">
+              <div className="flex items-center justify-between gap-3">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setShowMobileChat(false)}
+                  className="flex-shrink-0"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Button>
+                <div className="flex-1">
+                  <CardTitle className="text-lg">
+                    {doctorNames[selectedDoctorId || ''] || 'Doctor'}
+                  </CardTitle>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      if (selectedDoctorId) {
+                        initiateCall(selectedDoctorId, doctorNames[selectedDoctorId] || 'Doctor', 'voice');
+                      }
+                    }}
+                    className="hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <Phone className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      if (selectedDoctorId) {
+                        initiateCall(selectedDoctorId, doctorNames[selectedDoctorId] || 'Doctor', 'video');
+                      }
+                    }}
+                    className="hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <Video className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+              <div className="space-y-4 p-4">
+                {(directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedDoctorId || m.sender_id === selectedDoctorId))).length > 0 ? (
+                  (directMessageMode ? directMessages : messages.filter(m => (m.receiver_id === selectedDoctorId || m.sender_id === selectedDoctorId))).map((message) => {
+                    const isOwn = message.sender_id === user?._id;
+                    return (
+                      <div
+                        key={message._id}
+                        className={cn(
+                          "flex gap-3",
+                          isOwn ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        {!isOwn && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-gradient-secondary text-secondary-foreground text-xs">
+                              Dr
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div
+                          className={cn(
+                            "max-w-[70%] rounded-2xl px-4 py-2",
+                            isOwn
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-foreground"
+                          )}
+                        >
+                          <p className="text-sm">{message.content}</p>
+                          <p
+                            className={cn(
+                              "text-xs mt-1",
+                              isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                            )}
+                          >
+                            {format(new Date(message.timestamp), 'HH:mm')}
+                          </p>
+                        </div>
+                        {isOwn && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-gradient-primary text-primary-foreground text-xs">
+                              {getInitials(user?.name || 'U')}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-12">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">No messages yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Start the conversation with your doctor
+                    </p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t flex-shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+                className="flex gap-2"
+              >
+                <Input
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Type your message..."
+                  disabled={sending}
+                  className="flex-1"
+                />
+                <Button type="submit" disabled={sending || !messageText.trim()} className="gap-2 px-3">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

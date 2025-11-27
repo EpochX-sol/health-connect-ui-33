@@ -178,17 +178,12 @@ const BookAppointment = () => {
         hours: hours_duration,
       } as any);
 
-      const { appointment, payment } = response;
-
-      toast({
-        title: 'Processing payment',
-        description: 'Redirecting to Chapa...',
-      });
+      const appointment = response.appointment || response;
 
       // Calculate cost for Chapa
       const totalAmount = hours_duration * (selectedDoctor!.pricePerHour || 0);
 
-      // Get the return URL for after payment
+      // Get the return URL for after payment - Chapa will append tx_ref parameter
       const returnUrl = `${window.location.origin}/patient/payment-status?appointment_id=${appointment._id}`;
 
       // Initialize payment directly with Chapa
@@ -200,20 +195,28 @@ const BookAppointment = () => {
       }, token);
 
       if (paymentResponse.checkout_url) {
-        // Redirect directly to Chapa checkout
+        // Close modal and redirect to Chapa checkout
         setShowPaymentModal(false);
+        
+        toast({
+          title: 'Processing payment',
+          description: 'Redirecting to Chapa...',
+        });
+
+        // Redirect directly to Chapa checkout URL
         window.location.href = paymentResponse.checkout_url;
       } else {
         throw new Error('Failed to get Chapa checkout URL');
       }
     } catch (error) {
       console.error('Error creating appointment or initializing payment:', error);
+      
       toast({
         title: 'Failed to process',
         description: error instanceof Error ? error.message : 'Please try again',
         variant: 'destructive',
       });
-    } finally {
+      
       setBooking(false);
     }
   };

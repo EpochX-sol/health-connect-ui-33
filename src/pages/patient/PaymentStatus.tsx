@@ -19,41 +19,81 @@ const PaymentStatus = () => {
   useEffect(() => {
     const verifyPayment = async () => {
       try {
-        // Get the tx_ref from URL parameters (from Chapa redirect)
+        // Get the tx_ref from URL parameters (Chapa will redirect here with tx_ref)
         const tx_ref = searchParams.get('tx_ref');
         const appointment_id = searchParams.get('appointment_id');
 
-        if (!tx_ref) {
-          setStatus('error');
-          setMessage('No transaction reference found. Please contact support.');
-          return;
-        }
+        console.log('Payment status page - tx_ref:', tx_ref, 'appointment_id:', appointment_id);
 
-        // Validate the payment with the backend
-        const result = await api.validatePayment(tx_ref, token);
+        // If we have tx_ref, verify the payment
+        if (tx_ref && tx_ref !== 'null') {
+          // Validate the payment with the backend
+          const result = await api.validatePayment(tx_ref, token);
 
-        if (result.success || result.status === 'paid') {
-          setStatus('success');
-          setMessage('Payment verified! Your appointment is confirmed.');
-          
-          toast({
-            title: 'Payment Successful',
-            description: 'Your appointment has been confirmed.',
-          });
+          console.log('Validation result:', result);
 
-          // Redirect to appointments after 3 seconds
-          setTimeout(() => {
-            navigate('/patient/appointments');
-          }, 3000);
+          if (result.success || result.chapa?.status === 'success' || result.status === 'success') {
+            setStatus('success');
+            setMessage('Payment verified! Your appointment is confirmed.');
+            
+            toast({
+              title: 'Payment Successful',
+              description: 'Your appointment has been confirmed.',
+            });
+
+            // Redirect to appointments after 3 seconds
+            setTimeout(() => {
+              navigate('/patient/appointments');
+            }, 3000);
+          } else {
+            setStatus('error');
+            setMessage('Payment verification failed. Please try again or contact support.');
+            
+            toast({
+              title: 'Payment Verification Failed',
+              description: 'Your payment could not be verified',
+              variant: 'destructive',
+            });
+          }
+        } else if (appointment_id && appointment_id !== 'null') {
+          // Fallback: Check appointment status if no tx_ref
+          try {
+            const appointment = await api.getAppointmentById(appointment_id, token);
+            
+            console.log('Appointment data:', appointment);
+            
+            // Check if appointment is booked (payment successful) or has a payment_id
+            if (appointment && (appointment.status === 'booked' || appointment.payment_id)) {
+              setStatus('success');
+              setMessage('Payment verified! Your appointment is confirmed.');
+              
+              toast({
+                title: 'Payment Successful',
+                description: 'Your appointment has been confirmed.',
+              });
+
+              // Redirect to appointments after 3 seconds
+              setTimeout(() => {
+                navigate('/patient/appointments');
+              }, 3000);
+            } else {
+              setStatus('error');
+              setMessage('Payment pending or not found. Please try the payment process again.');
+              
+              toast({
+                title: 'Payment Status Unknown',
+                description: 'Unable to verify payment status',
+                variant: 'destructive',
+              });
+            }
+          } catch (appointmentError) {
+            console.error('Error fetching appointment:', appointmentError);
+            setStatus('error');
+            setMessage('Could not verify appointment. Please contact support.');
+          }
         } else {
           setStatus('error');
-          setMessage('Payment verification failed. Please try again or contact support.');
-          
-          toast({
-            title: 'Payment Verification Failed',
-            description: 'Your payment could not be verified',
-            variant: 'destructive',
-          });
+          setMessage('No transaction reference or appointment found. Please contact support.');
         }
       } catch (error) {
         console.error('Payment verification error:', error);

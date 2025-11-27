@@ -9,6 +9,7 @@ interface AuthContextType {
   logout: () => void;
   updateUser: (user: User) => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,13 +17,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Restore session from localStorage on app load
     const auth = authStorage.get();
     if (auth) {
       setUser(auth.user);
       setToken(auth.token);
     }
+    setIsLoading(false);
   }, []);
 
   const login = (data: AuthData) => {
@@ -53,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         updateUser,
         isAuthenticated: !!user && !!token,
+        isLoading,
       }}
     >
       {children}
