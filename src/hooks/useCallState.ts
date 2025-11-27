@@ -552,6 +552,9 @@ export const useCallState = (socket: Socket | null) => {
           ]
         });
 
+        // Store remote socket ID on peer connection for later use
+        (peerConnection as any).remoteSocketId = remoteSocketId;
+
         // Add local stream tracks
         if (localStream) {
           console.log(`[WebRTC] Adding local stream tracks (${localStream.getTracks().length} tracks) to peer connection`);
@@ -616,10 +619,12 @@ export const useCallState = (socket: Socket | null) => {
           const offer = await peerConnection.createOffer();
           await peerConnection.setLocalDescription(offer);
 
+          console.log(`[WebRTC] Sending offer to ${remoteSocketId}`);
           socket.emit('offer', {
             offer,
-            callSessionId: activeCall.callSessionId,
-            from: socket.id
+            to: remoteSocketId,
+            from: socket.id,
+            callSessionId: activeCall.callSessionId
           });
           console.log(`[WebRTC] Offer sent to ${remoteSocketId}`);
         } else {
@@ -659,8 +664,9 @@ export const useCallState = (socket: Socket | null) => {
             console.log(`[WebRTC] Sending answer back to ${from}`);
             socket.emit('answer', {
               answer,
-              callSessionId: activeCall.callSessionId,
-              from: socket.id
+              to: from,
+              from: socket.id,
+              callSessionId: activeCall.callSessionId
             });
           }
 
