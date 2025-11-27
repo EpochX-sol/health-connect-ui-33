@@ -20,6 +20,7 @@ export const ActiveCallModal = ({
 }: ActiveCallModalProps) => {
   const [duration, setDuration] = useState(0);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (!activeCall) return;
@@ -35,12 +36,18 @@ export const ActiveCallModal = ({
   const remoteStream = remoteStreams.size > 0 ? Array.from(remoteStreams.values())[0] : null;
   console.log('[MODAL] Remote streams count:', remoteStreams.size, 'Call type:', activeCall?.callType);
 
-  // Attach remote stream to video element if video call
+  // Attach remote stream to video element if video call, or audio element for voice call
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream && activeCall?.callType === 'video') {
-      console.log('[MODAL] Attaching remote stream for video call:', remoteStream);
-      remoteVideoRef.current.srcObject = remoteStream;
-      console.log('[MODAL] Remote stream attached');
+    if (remoteStream) {
+      if (activeCall?.callType === 'video' && remoteVideoRef.current) {
+        console.log('[MODAL] Attaching remote stream for video call:', remoteStream);
+        remoteVideoRef.current.srcObject = remoteStream;
+        console.log('[MODAL] Remote video stream attached');
+      } else if (activeCall?.callType === 'voice' && remoteAudioRef.current) {
+        console.log('[MODAL] Attaching remote stream for voice call:', remoteStream);
+        remoteAudioRef.current.srcObject = remoteStream;
+        console.log('[MODAL] Remote audio stream attached');
+      }
     }
   }, [remoteStream, activeCall?.callType]);
 
@@ -71,6 +78,16 @@ export const ActiveCallModal = ({
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-6 py-8">
+          {/* Remote Audio for Voice Calls (hidden but playing) */}
+          {activeCall.callType === 'voice' && (
+            <audio
+              ref={remoteAudioRef}
+              autoPlay
+              playsInline
+              className="hidden"
+            />
+          )}
+          
           {/* Video Stream for Video Calls */}
           {activeCall.callType === 'video' && remoteStream ? (
             <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
