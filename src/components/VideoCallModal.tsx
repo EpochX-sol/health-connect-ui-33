@@ -39,14 +39,25 @@ export const VideoCallModal = ({
   // Attach local stream to video element
   useEffect(() => {
     if (localVideoRef.current && localStream) {
+      console.log('[VIDEO] Attaching local stream to video element:', localStream);
       localVideoRef.current.srcObject = localStream;
+      console.log('[VIDEO] Local stream attached');
+    } else {
+      if (!localVideoRef.current) console.log('[VIDEO] Local video ref not ready');
+      if (!localStream) console.log('[VIDEO] No local stream available');
     }
   }, [localStream]);
 
   // Attach remote stream to video element
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
+      console.log('[VIDEO] Attaching remote stream to video element:', remoteStream);
+      console.log('[VIDEO] Remote stream tracks:', remoteStream.getTracks());
       remoteVideoRef.current.srcObject = remoteStream;
+      console.log('[VIDEO] Remote stream attached');
+    } else {
+      if (!remoteVideoRef.current) console.log('[VIDEO] Remote video ref not ready');
+      if (!remoteStream) console.log('[VIDEO] No remote stream available');
     }
   }, [remoteStream]);
 

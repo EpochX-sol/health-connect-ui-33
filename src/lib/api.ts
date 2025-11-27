@@ -6,8 +6,7 @@ export const api = {
       if (token) headers.Authorization = `Bearer ${token}`;
       const response = await fetch(`${API_BASE_URL}/messages/user/${userId}`, { headers });
       if (!response.ok) throw new Error('Failed to fetch messages by user');
-      const result = await response.json();
-      console.log('getMessagesByUser:', result);
+      const result = await response.json(); 
       return result;
     },
   register: async (data: { name: string; email: string; password: string; role: string }) => {
@@ -366,8 +365,7 @@ export const api = {
     
     const response = await fetch(`${API_BASE_URL}/messages/appointment/${appointmentId}`, { headers });
     if (!response.ok) throw new Error('Failed to fetch messages');
-    const result = await response.json();
-    console.log('getMessagesByAppointment:', result);
+    const result = await response.json(); 
     return result;
   },
 
@@ -377,8 +375,7 @@ export const api = {
     
     const response = await fetch(`${API_BASE_URL}/messages/between/${user1}/${user2}`, { headers });
     if (!response.ok) throw new Error('Failed to fetch messages');
-    const result = await response.json();
-    console.log('getMessagesBetweenUsers:', result);
+    const result = await response.json(); 
     return result;
   },
 
@@ -388,8 +385,7 @@ export const api = {
     
     const response = await fetch(`${API_BASE_URL}/messages`, { headers });
     if (!response.ok) throw new Error('Failed to fetch messages');
-    const result = await response.json();
-    console.log('getMessages:', result);
+    const result = await response.json(); 
     return result;
   },
 

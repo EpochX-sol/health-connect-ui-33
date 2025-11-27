@@ -118,7 +118,7 @@ export const useCallState = (socket: Socket | null) => {
 
     // Listen for call accepted
     socket.on('call-accepted', (data: { callSessionId: string; roomId: string; callType: 'voice' | 'video' }) => {
-      console.log('Call accepted');
+      console.log('[CALL] Call accepted by recipient', data);
       
       // Clear the 30-second timeout
       if (outgoingCallTimerRef.current) {
@@ -128,6 +128,7 @@ export const useCallState = (socket: Socket | null) => {
       // Use state updater function to avoid stale closure
       setOutgoingCall((prevOut) => {
         if (prevOut) {
+          console.log('[CALL] Setting active call state after acceptance');
           setActiveCall({
             callSessionId: data.callSessionId,
             roomId: data.roomId,
@@ -136,6 +137,9 @@ export const useCallState = (socket: Socket | null) => {
             participantName: prevOut.recipientName,
             startTime: new Date(),
           });
+          console.log('[CALL] Creating peer connection as initiator');
+          // Create peer connection as we're the initiator
+          // This will happen through the active call listeners
         }
         return null;
       });
@@ -145,13 +149,14 @@ export const useCallState = (socket: Socket | null) => {
 
     // Listen for call confirmed (recipient side)
     socket.on('call-confirmed', (data: { callSessionId: string; roomId: string; callType: 'voice' | 'video' }) => {
-      console.log('Call confirmed');
+      console.log('[CALL] Call confirmed - call is now active', data);
       stopRingtone();
       stopAllSounds();
 
       // Use state updater function to avoid stale closure
       setIncomingCall((prevIn) => {
         if (prevIn) {
+          console.log('[CALL] Setting active call state after confirmation');
           setActiveCall({
             callSessionId: data.callSessionId,
             roomId: data.roomId,
@@ -288,16 +293,21 @@ export const useCallState = (socket: Socket | null) => {
   // Get media stream for call
   const getMediaStream = useCallback(async (callType: 'voice' | 'video') => {
     try {
+      console.log(`[MEDIA] Requesting ${callType} media stream...`);
       const constraints = {
         audio: true,
         video: callType === 'video' ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log(`[MEDIA] Successfully got ${callType} stream:`, stream);
+      console.log(`[MEDIA] Audio tracks:`, stream.getAudioTracks());
+      console.log(`[MEDIA] Video tracks:`, stream.getVideoTracks());
+      
       setLocalStream(stream);
       return stream;
     } catch (error) {
-      console.error('Error getting media stream:', error);
+      console.error('[MEDIA ERROR] Failed to get media stream:', error);
       toast({
         title: 'Error',
         description: 'Unable to access microphone' + (callType === 'video' ? ' and camera' : ''),
@@ -310,10 +320,15 @@ export const useCallState = (socket: Socket | null) => {
   // Stop media stream
   const stopMediaStream = useCallback(() => {
     if (localStream) {
+      console.log('[MEDIA] Stopping local stream, tracks:', localStream.getTracks().length);
       localStream.getTracks().forEach(track => {
+        console.log(`[MEDIA] Stopping ${track.kind} track:`, track);
         track.stop();
       });
       setLocalStream(null);
+      console.log('[MEDIA] Local stream stopped');
+    } else {
+      console.log('[MEDIA] No local stream to stop');
     }
   }, [localStream]);
 
@@ -354,16 +369,24 @@ export const useCallState = (socket: Socket | null) => {
   // Initiate call
   const initiateCall = useCallback(
     async (recipientId: string, recipientName: string, callType: 'voice' | 'video') => {
-      if (!socket) return;
+      if (!socket) {
+        console.log('[CALL] No socket connection');
+        return;
+      }
 
       try {
+        console.log(`[CALL] Initiating ${callType} call to ${recipientName} (${recipientId})`);
+        
         // Get media stream before initiating call
+        console.log(`[CALL] Getting media stream for ${callType} call...`);
         await getMediaStream(callType);
+        console.log(`[CALL] Media stream acquired successfully`);
 
         socket.emit('initiate-call', {
           recipientId,
           callType,
         });
+        console.log(`[CALL] Initiate call event emitted`);
 
         setOutgoingCall({
           recipientId,
@@ -375,6 +398,7 @@ export const useCallState = (socket: Socket | null) => {
 
         // Set 30-second timeout for call
         const timer = setTimeout(() => {
+          console.log(`[CALL] 30 second timeout - no answer received`);
           // Auto-cancel if no response (don't reference stale outgoingCall)
           socket.emit('cancel-call', {
             recipientId,
@@ -392,7 +416,7 @@ export const useCallState = (socket: Socket | null) => {
 
         outgoingCallTimerRef.current = timer;
       } catch (error) {
-        console.error('Error initiating call:', error);
+        console.error('[CALL ERROR] Error initiating call:', error);
         setOutgoingCall(null);
       }
     },
@@ -401,11 +425,18 @@ export const useCallState = (socket: Socket | null) => {
 
   // Accept incoming call
   const acceptCall = useCallback(async () => {
-    if (!socket || !incomingCall) return;
+    if (!socket || !incomingCall) {
+      console.log('[CALL] Cannot accept call - missing socket or incoming call data');
+      return;
+    }
 
     try {
+      console.log(`[CALL] Accepting incoming ${incomingCall.callType} call from ${incomingCall.callerName}`);
+      
       // Get media stream based on call type
+      console.log(`[CALL] Getting media stream for ${incomingCall.callType} call...`);
       await getMediaStream(incomingCall.callType);
+      console.log(`[CALL] Media stream acquired`);
 
       // Clear any pending outgoing call timeout
       if (outgoingCallTimerRef.current) {
@@ -417,10 +448,11 @@ export const useCallState = (socket: Socket | null) => {
         callSessionId: incomingCall.callSessionId,
         recipientId: incomingCall.callerId,
       });
+      console.log(`[CALL] Accept call event emitted`);
 
       stopRingtone();
     } catch (error) {
-      console.error('Error accepting call:', error);
+      console.error('[CALL ERROR] Error accepting call:', error);
     }
   }, [socket, incomingCall, stopRingtone, getMediaStream]);
 
@@ -464,6 +496,7 @@ export const useCallState = (socket: Socket | null) => {
   const createPeerConnection = useCallback(
     async (remoteSocketId: string, isInitiator: boolean) => {
       try {
+        console.log(`[WebRTC] Creating peer connection with ${remoteSocketId}, isInitiator: ${isInitiator}`);
         const peerConnection = new RTCPeerConnection({
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -473,44 +506,60 @@ export const useCallState = (socket: Socket | null) => {
 
         // Add local stream tracks
         if (localStream) {
+          console.log(`[WebRTC] Adding local stream tracks (${localStream.getTracks().length} tracks) to peer connection`);
           localStream.getTracks().forEach(track => {
+            console.log(`[WebRTC] Adding ${track.kind} track to peer connection`);
             peerConnection.addTrack(track, localStream);
           });
+        } else {
+          console.warn('[WebRTC] No local stream available to add tracks!');
         }
 
         // Handle incoming remote stream
         peerConnection.ontrack = (event) => {
-          console.log('Remote track received from:', remoteSocketId);
+          console.log(`[WebRTC] Remote track received from ${remoteSocketId}:`, event.track.kind);
+          console.log('[WebRTC] Event streams:', event.streams);
           if (event.streams && event.streams[0]) {
-            setRemoteStreams(prev => new Map(prev).set(remoteSocketId, event.streams[0]));
+            console.log(`[WebRTC] Setting remote stream with ${event.streams[0].getTracks().length} tracks`);
+            setRemoteStreams(prev => {
+              const newMap = new Map(prev);
+              newMap.set(remoteSocketId, event.streams[0]);
+              console.log('[WebRTC] Remote streams updated:', newMap.size);
+              return newMap;
+            });
           }
         };
 
         // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
-          if (event.candidate && socket) {
-            socket.emit('ice-candidate', {
-              candidate: event.candidate,
-              to: remoteSocketId,
-              from: socket.id,
-              callSessionId: activeCall?.callSessionId
-            });
+          if (event.candidate) {
+            console.log(`[WebRTC] ICE candidate generated for ${remoteSocketId}`);
+            if (socket) {
+              socket.emit('ice-candidate', {
+                candidate: event.candidate,
+                to: remoteSocketId,
+                from: socket.id,
+                callSessionId: activeCall?.callSessionId
+              });
+            }
           }
         };
 
         // Monitor connection state
         peerConnection.onconnectionstatechange = () => {
-          console.log(`Connection state with ${remoteSocketId}:`, peerConnection.connectionState);
+          console.log(`[WebRTC] Connection state with ${remoteSocketId}: ${peerConnection.connectionState}`);
           if (peerConnection.connectionState === 'failed') {
-            console.error('Connection failed');
+            console.error('[WebRTC] Connection failed, restarting ICE');
             peerConnection.restartIce();
           }
         };
 
         peerConnectionsRef.current.set(remoteSocketId, peerConnection);
+        console.log(`[WebRTC] Peer connection created and stored`);
 
         // If initiator, create and send offer
         if (isInitiator && socket && activeCall) {
+          console.log(`[WebRTC] Creating offer for ${remoteSocketId}`);
           const offer = await peerConnection.createOffer();
           await peerConnection.setLocalDescription(offer);
 
@@ -519,12 +568,14 @@ export const useCallState = (socket: Socket | null) => {
             callSessionId: activeCall.callSessionId,
             from: socket.id
           });
-          console.log('WebRTC offer sent to:', remoteSocketId);
+          console.log(`[WebRTC] Offer sent to ${remoteSocketId}`);
+        } else {
+          console.log(`[WebRTC] Not an initiator, waiting for offer`);
         }
 
         return peerConnection;
       } catch (err) {
-        console.error('Error creating peer connection:', err);
+        console.error('[WebRTC ERROR] Error creating peer connection:', err);
         throw err;
       }
     },
@@ -535,19 +586,24 @@ export const useCallState = (socket: Socket | null) => {
   const handleWebRTCOffer = useCallback(
     async (offer: RTCSessionDescriptionInit, from: string) => {
       try {
+        console.log(`[WebRTC] Handling offer from ${from}`);
         let peerConnection = peerConnectionsRef.current.get(from);
 
         if (!peerConnection) {
+          console.log(`[WebRTC] No peer connection found, creating one for ${from}`);
           peerConnection = await createPeerConnection(from, false);
         }
 
         if (peerConnection) {
+          console.log(`[WebRTC] Setting remote description (offer) for ${from}`);
           await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
 
+          console.log(`[WebRTC] Creating answer for ${from}`);
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
 
           if (socket && activeCall) {
+            console.log(`[WebRTC] Sending answer back to ${from}`);
             socket.emit('webrtc-answer', {
               answer,
               callSessionId: activeCall.callSessionId,
@@ -555,10 +611,10 @@ export const useCallState = (socket: Socket | null) => {
             });
           }
 
-          console.log('WebRTC answer sent to:', from);
+          console.log(`[WebRTC] Answer sent to ${from}`);
         }
       } catch (err) {
-        console.error('Error handling WebRTC offer:', err);
+        console.error('[WebRTC ERROR] Error handling WebRTC offer:', err);
       }
     },
     [socket, activeCall, createPeerConnection]
@@ -568,13 +624,17 @@ export const useCallState = (socket: Socket | null) => {
   const handleWebRTCAnswer = useCallback(
     async (answer: RTCSessionDescriptionInit, from: string) => {
       try {
+        console.log(`[WebRTC] Handling answer from ${from}`);
         const peerConnection = peerConnectionsRef.current.get(from);
         if (peerConnection) {
+          console.log(`[WebRTC] Setting remote description (answer) for ${from}`);
           await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-          console.log('Remote description set for:', from);
+          console.log(`[WebRTC] Remote description set for ${from}`);
+        } else {
+          console.warn(`[WebRTC] No peer connection found for ${from} when handling answer`);
         }
       } catch (err) {
-        console.error('Error handling WebRTC answer:', err);
+        console.error('[WebRTC ERROR] Error handling WebRTC answer:', err);
       }
     },
     []
@@ -586,10 +646,13 @@ export const useCallState = (socket: Socket | null) => {
       try {
         const peerConnection = peerConnectionsRef.current.get(from);
         if (peerConnection && candidate) {
+          console.log(`[WebRTC] Adding ICE candidate from ${from}`);
           await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } else if (!peerConnection) {
+          console.warn(`[WebRTC] No peer connection found for ${from} when adding ICE candidate`);
         }
       } catch (err) {
-        console.error('Error adding ICE candidate:', err);
+        console.error('[WebRTC ERROR] Error adding ICE candidate:', err);
       }
     },
     []

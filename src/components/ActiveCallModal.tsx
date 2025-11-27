@@ -33,11 +33,14 @@ export const ActiveCallModal = ({
 
   // Get the first remote stream (in case of multiple participants)
   const remoteStream = remoteStreams.size > 0 ? Array.from(remoteStreams.values())[0] : null;
+  console.log('[MODAL] Remote streams count:', remoteStreams.size, 'Call type:', activeCall?.callType);
 
   // Attach remote stream to video element if video call
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream && activeCall?.callType === 'video') {
+      console.log('[MODAL] Attaching remote stream for video call:', remoteStream);
       remoteVideoRef.current.srcObject = remoteStream;
+      console.log('[MODAL] Remote stream attached');
     }
   }, [remoteStream, activeCall?.callType]);
 
