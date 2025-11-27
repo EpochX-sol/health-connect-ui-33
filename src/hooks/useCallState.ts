@@ -336,7 +336,7 @@ export const useCallState = (socket: Socket | null) => {
       socket.off('answer');
       socket.off('ice-candidate');
     };
-  }, [socket, user, outgoingCall, incomingCall, createPeerConnection]);
+  }, [socket, user, outgoingCall, incomingCall]);
 
   // Get media stream for call
   const getMediaStream = useCallback(async (callType: 'voice' | 'video') => {
