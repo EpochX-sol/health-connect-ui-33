@@ -50,22 +50,27 @@ export const useCallState = (socket: Socket | null) => {
 
   // Initialize ringtone and ringback audio elements
   useEffect(() => {
-    // Create ringtone (for incoming calls)
-    ringtoneRef.current = new Audio('/sounds/ringtone.mp3');
+    // Create ringtone (for incoming calls) - use sound.mp3
+    ringtoneRef.current = new Audio('/sounds/sound.mp3');
     if (ringtoneRef.current) {
       ringtoneRef.current.loop = true;
       ringtoneRef.current.volume = 0.8;
     }
 
-    // Create ringback tone (for outgoing calls)
-    ringbackRef.current = new Audio('/sounds/ringback.mp3');
+    // Create ringback tone (for outgoing calls) - use sound.mp3
+    ringbackRef.current = new Audio('/sounds/sound.mp3');
     if (ringbackRef.current) {
       ringbackRef.current.loop = true;
       ringbackRef.current.volume = 0.6;
     }
 
     return () => {
-      stopAllSounds();
+      if (ringtoneRef.current) {
+        ringtoneRef.current.pause();
+      }
+      if (ringbackRef.current) {
+        ringbackRef.current.pause();
+      }
     };
   }, []);
 
@@ -105,40 +110,50 @@ export const useCallState = (socket: Socket | null) => {
     // Listen for call accepted
     socket.on('call-accepted', (data: { callSessionId: string; roomId: string; callType: 'voice' | 'video' }) => {
       console.log('Call accepted');
-      setOutgoingCall(null);
+      
+      // Clear the 30-second timeout
+      if (outgoingCallTimerRef.current) {
+        clearTimeout(outgoingCallTimerRef.current);
+      }
+      
+      // Use state updater function to avoid stale closure
+      setOutgoingCall((prevOut) => {
+        if (prevOut) {
+          setActiveCall({
+            callSessionId: data.callSessionId,
+            roomId: data.roomId,
+            callType: data.callType,
+            participantId: prevOut.recipientId,
+            participantName: prevOut.recipientName,
+            startTime: new Date(),
+          });
+        }
+        return null;
+      });
       stopRingbackTone();
       stopAllSounds();
-
-      // Transition to active call
-      if (outgoingCall) {
-        setActiveCall({
-          callSessionId: data.callSessionId,
-          roomId: data.roomId,
-          callType: data.callType,
-          participantId: outgoingCall.recipientId,
-          participantName: outgoingCall.recipientName,
-          startTime: new Date(),
-        });
-      }
     });
 
     // Listen for call confirmed (recipient side)
     socket.on('call-confirmed', (data: { callSessionId: string; roomId: string; callType: 'voice' | 'video' }) => {
       console.log('Call confirmed');
-      setIncomingCall(null);
       stopRingtone();
       stopAllSounds();
 
-      if (incomingCall) {
-        setActiveCall({
-          callSessionId: data.callSessionId,
-          roomId: data.roomId,
-          callType: data.callType,
-          participantId: incomingCall.callerId,
-          participantName: incomingCall.callerName,
-          startTime: new Date(),
-        });
-      }
+      // Use state updater function to avoid stale closure
+      setIncomingCall((prevIn) => {
+        if (prevIn) {
+          setActiveCall({
+            callSessionId: data.callSessionId,
+            roomId: data.roomId,
+            callType: data.callType,
+            participantId: prevIn.callerId,
+            participantName: prevIn.callerName,
+            startTime: new Date(),
+          });
+        }
+        return null;
+      });
     });
 
     // Listen for call rejected
@@ -296,30 +311,34 @@ export const useCallState = (socket: Socket | null) => {
 
       // Set 30-second timeout for call
       const timer = setTimeout(() => {
-        if (outgoingCall) {
-          // Auto-cancel if no response
-          socket.emit('cancel-call', {
-            recipientId,
-            callSessionId: outgoingCall.callSessionId,
-          });
-          setOutgoingCall(null);
-          stopRingbackTone();
-          toast({
-            title: 'No Answer',
-            description: 'The call was not answered',
-            variant: 'destructive',
-          });
-        }
+        // Auto-cancel if no response (don't reference stale outgoingCall)
+        socket.emit('cancel-call', {
+          recipientId,
+          callSessionId: undefined,
+        });
+        setOutgoingCall(null);
+        stopRingbackTone();
+        toast({
+          title: 'No Answer',
+          description: 'The call was not answered',
+          variant: 'destructive',
+        });
       }, 30000); // 30 seconds
 
       outgoingCallTimerRef.current = timer;
     },
-    [socket, outgoingCall, playRingbackTone, stopRingbackTone, toast]
+    [socket, playRingbackTone, stopRingbackTone, toast]
   );
 
   // Accept incoming call
   const acceptCall = useCallback(() => {
     if (!socket || !incomingCall) return;
+
+    // Clear any pending outgoing call timeout
+    if (outgoingCallTimerRef.current) {
+      clearTimeout(outgoingCallTimerRef.current);
+      outgoingCallTimerRef.current = null;
+    }
 
     socket.emit('accept-call', {
       callSessionId: incomingCall.callSessionId,
@@ -332,6 +351,12 @@ export const useCallState = (socket: Socket | null) => {
   // Reject incoming call
   const rejectCall = useCallback(() => {
     if (!socket || !incomingCall) return;
+
+    // Clear any pending outgoing call timeout
+    if (outgoingCallTimerRef.current) {
+      clearTimeout(outgoingCallTimerRef.current);
+      outgoingCallTimerRef.current = null;
+    }
 
     socket.emit('reject-call', {
       callSessionId: incomingCall.callSessionId,
@@ -362,6 +387,12 @@ export const useCallState = (socket: Socket | null) => {
   // End active call
   const endCall = useCallback(() => {
     if (!socket || !activeCall) return;
+
+    // Clear any pending outgoing call timeout
+    if (outgoingCallTimerRef.current) {
+      clearTimeout(outgoingCallTimerRef.current);
+      outgoingCallTimerRef.current = null;
+    }
 
     socket.emit('end-call', {
       callSessionId: activeCall.callSessionId,

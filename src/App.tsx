@@ -7,6 +7,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { CallSystemProvider, useCallSystem } from "./contexts/CallSystemContext";
 import IncomingCallModal from "./components/IncomingCallModal";
 import OutgoingCallModal from "./components/OutgoingCallModal";
+import ActiveCallModal from "./components/ActiveCallModal";
 import RootRedirect from "./components/RootRedirect";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -40,12 +41,13 @@ const queryClient = new QueryClient();
 
 // Component to show call modals
 const AppContent = () => {
-  const { incomingCall, outgoingCall, acceptCall, rejectCall, cancelCall } = useCallSystem();
+  const { incomingCall, outgoingCall, activeCall, acceptCall, rejectCall, cancelCall, endCall } = useCallSystem();
 
   return (
     <>
       <IncomingCallModal incomingCall={incomingCall} onAccept={acceptCall} onReject={rejectCall} />
       <OutgoingCallModal outgoingCall={outgoingCall} onCancel={cancelCall} />
+      {activeCall && <ActiveCallModal activeCall={activeCall} onEndCall={endCall} />}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<><RootRedirect /><Index /></>} />
