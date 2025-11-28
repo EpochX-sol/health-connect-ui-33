@@ -59,18 +59,30 @@ export const useCallState = (socket: Socket | null) => {
 
   // Initialize ringtone and ringback audio elements
   useEffect(() => {
-    // Create ringtone (for incoming calls) - use sound.mp3
-    ringtoneRef.current = new Audio('/sounds/sound.mp3');
+    // Create ringtone (for incoming calls) - receiver hears when being called
+    // Falls back to sound.mp3 if ringtone.mp3 doesn't exist
+    ringtoneRef.current = new Audio('/sounds/ringtone.mp3');
     if (ringtoneRef.current) {
       ringtoneRef.current.loop = true;
       ringtoneRef.current.volume = 0.8;
+      // Fallback to sound.mp3 if ringtone.mp3 fails to load
+      ringtoneRef.current.addEventListener('error', () => {
+        console.warn('[AUDIO] ringtone.mp3 not found, falling back to sound.mp3');
+        ringtoneRef.current!.src = '/sounds/sound.mp3';
+      });
     }
 
-    // Create ringback tone (for outgoing calls) - use sound.mp3
-    ringbackRef.current = new Audio('/sounds/sound.mp3');
+    // Create ringback tone (for outgoing calls) - caller hears while calling
+    // Falls back to sound.mp3 if ringback.mp3 doesn't exist
+    ringbackRef.current = new Audio('/sounds/ringback.mp3');
     if (ringbackRef.current) {
       ringbackRef.current.loop = true;
       ringbackRef.current.volume = 0.6;
+      // Fallback to sound.mp3 if ringback.mp3 fails to load
+      ringbackRef.current.addEventListener('error', () => {
+        console.warn('[AUDIO] ringback.mp3 not found, falling back to sound.mp3');
+        ringbackRef.current!.src = '/sounds/sound.mp3';
+      });
     }
 
     return () => {
@@ -210,9 +222,12 @@ export const useCallState = (socket: Socket | null) => {
 
     // Listen for call ended
     socket.on('call-ended', () => {
-      console.log('Call ended');
+      console.log('Call ended from remote participant');
       setActiveCall(null);
       stopAllSounds();
+      // Cleanup media streams and peer connections
+      stopMediaStream();
+      cleanupPeerConnections();
     });
 
     // Listen for user offline
@@ -508,6 +523,8 @@ export const useCallState = (socket: Socket | null) => {
   const rejectCall = useCallback(() => {
     if (!socket || !incomingCall) return;
 
+    console.log('[CALL] Rejecting incoming call');
+
     // Clear any pending outgoing call timeout
     if (outgoingCallTimerRef.current) {
       clearTimeout(outgoingCallTimerRef.current);
@@ -521,11 +538,14 @@ export const useCallState = (socket: Socket | null) => {
 
     setIncomingCall(null);
     stopRingtone();
-  }, [socket, incomingCall, stopRingtone]);
+    stopMediaStream();
+  }, [socket, incomingCall, stopRingtone, stopMediaStream]);
 
   // Cancel outgoing call
   const cancelCall = useCallback(() => {
     if (!socket || !outgoingCall) return;
+
+    console.log('[CALL] Cancelling outgoing call');
 
     socket.emit('cancel-call', {
       recipientId: outgoingCall.recipientId,
@@ -534,11 +554,13 @@ export const useCallState = (socket: Socket | null) => {
 
     setOutgoingCall(null);
     stopRingbackTone();
+    stopMediaStream();
 
     if (outgoingCallTimerRef.current) {
       clearTimeout(outgoingCallTimerRef.current);
+      outgoingCallTimerRef.current = null;
     }
-  }, [socket, outgoingCall, stopRingbackTone]);
+  }, [socket, outgoingCall, stopRingbackTone, stopMediaStream]);
 
   // Create peer connection
   const createPeerConnection = useCallback(
@@ -740,21 +762,44 @@ export const useCallState = (socket: Socket | null) => {
   const endCall = useCallback(() => {
     if (!socket || !activeCall) return;
 
+    console.log('[CALL] Ending call:', activeCall.callSessionId);
+
     // Clear any pending outgoing call timeout
     if (outgoingCallTimerRef.current) {
       clearTimeout(outgoingCallTimerRef.current);
       outgoingCallTimerRef.current = null;
     }
 
+    // Clear active call state immediately
+    setActiveCall(null);
+    
+    // Stop all sounds immediately
+    stopAllSounds();
+    
+    // Cleanup media streams and peer connections immediately
+    stopMediaStream();
+    cleanupPeerConnections();
+
+    // Emit end-call event to backend
     socket.emit('end-call', {
       callSessionId: activeCall.callSessionId,
     });
 
-    setActiveCall(null);
-    stopAllSounds();
-    stopMediaStream();
-    cleanupPeerConnections();
-  }, [socket, activeCall, stopAllSounds, stopMediaStream, cleanupPeerConnections]);
+    // Re-register user to notify backend we're no longer in a call
+    // This ensures the backend updates our presence state
+    setTimeout(() => {
+      if (user) {
+        console.log('[CALL] Re-registering user after call end');
+        socket.emit('register-user', {
+          userId: user._id,
+          userName: user.name,
+          userType: user.role,
+        });
+      }
+    }, 100);
+    
+    console.log('[CALL] Call ended and cleanup completed');
+  }, [socket, activeCall, user, stopAllSounds, stopMediaStream, cleanupPeerConnections]);
 
   return {
     incomingCall,
