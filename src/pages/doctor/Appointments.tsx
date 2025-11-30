@@ -154,13 +154,24 @@ const DoctorAppointments = () => {
                       </div>
                     </div>
 
-                    <Button
-                      onClick={() => navigate(`/doctor/appointment/${appointment._id}`)}
-                      className="gap-2 md:w-auto w-full"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View Details
-                    </Button>
+                    <div className="flex md:flex-col md:items-end w-full gap-2 md:w-auto">
+                      <Button
+                        onClick={() => navigate(`/doctor/appointment/${appointment._id}`)}
+                        className="gap-2 md:w-auto w-full"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View Details
+                      </Button>
+
+                      <Button
+                        onClick={() => navigate(`/doctor/messages?user1=${user?._id}&user2=${appointment.patient_id}`)}
+                        variant="outline"
+                        className="gap-2 md:w-auto w-full"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Message
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

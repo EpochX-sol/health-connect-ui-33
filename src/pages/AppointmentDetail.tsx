@@ -546,7 +546,11 @@ const AppointmentDetail = () => {
                   className="w-full gap-2"
                   onClick={() => {
                     const otherUserId = user?.role === 'patient' ? appointment.doctor_id : appointment.patient_id;
-                    navigate(`/patient/messages?user1=${user?._id}&user2=${otherUserId}`);
+                    if (user?.role === 'doctor') {
+                      navigate(`/doctor/messages?user1=${user?._id}&user2=${otherUserId}`);
+                    } else {
+                      navigate(`/patient/messages?user1=${user?._id}&user2=${otherUserId}`);
+                    }
                   }}
                 >
                   <MessageSquare className="h-4 w-4" />
