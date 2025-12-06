@@ -1,22 +1,6 @@
-# Welcome to your Lovable project
+# MedLink - Healthcare Connect Application
 
-## Project info
-
-**URL**: https://lovable.dev/projects/9607d648-5272-4598-bdcc-1c0a94be06ce
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/9607d648-5272-4598-bdcc-1c0a94be06ce) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Getting Started
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -42,13 +26,9 @@ npm run dev
 - Click the "Edit" button (pencil icon) at the top right of the file view.
 - Make your changes and commit the changes.
 
-**Use GitHub Codespaces**
+**Use your preferred IDE locally**
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Clone and edit the repository:
 
 ## What technologies are used for this project?
 
@@ -60,14 +40,13 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+## Deployment
 
-Simply open [Lovable](https://lovable.dev/projects/9607d648-5272-4598-bdcc-1c0a94be06ce) and click on Share -> Publish.
+You can deploy this project to any Node.js hosting platform such as:
 
-## Can I connect a custom domain to my Lovable project?
+- **Vercel** - Connect your GitHub repository and deploy with one click
+- **Netlify** - Deploy with automatic builds on push
+- **Heroku** - Deploy using the Heroku CLI
+- **AWS** - Deploy using AWS Amplify or EC2
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+For custom domain setup, refer to your hosting provider's documentation.
