@@ -235,13 +235,12 @@ const RegisterDoctor = () => {
                       type="text"
                       placeholder="MED-12345"
                       value={licenseNumber}
-                      onChange={(e) => setLicenseNumber(e.target.value)}
-                      required
+                      onChange={(e) => setLicenseNumber(e.target.value)} 
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="idCard">ID Card (URL)</Label>
+                    <Label htmlFor="idCard">ID Card (URL) <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                     <div className="flex gap-2">
                       <Input
                         id="idCard"
@@ -249,7 +248,6 @@ const RegisterDoctor = () => {
                         placeholder="https://example.com/id-card.jpg"
                         value={idCard}
                         onChange={(e) => setIdCard(e.target.value)}
-                        required
                       />
                       <Button type="button" variant="outline" size="icon">
                         <Upload className="w-4 h-4" />
@@ -259,7 +257,7 @@ const RegisterDoctor = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="certificate">Medical Certificate (URL)</Label>
+                    <Label htmlFor="certificate">Medical Certificate (URL) <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                     <div className="flex gap-2">
                       <Input
                         id="certificate"
@@ -267,7 +265,6 @@ const RegisterDoctor = () => {
                         placeholder="https://example.com/certificate.pdf"
                         value={certificate}
                         onChange={(e) => setCertificate(e.target.value)}
-                        required
                       />
                       <Button type="button" variant="outline" size="icon">
                         <Upload className="w-4 h-4" />

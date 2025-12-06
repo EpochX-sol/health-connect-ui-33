@@ -273,15 +273,17 @@ const DoctorPatients = () => {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() => navigate(`/doctor/messages?user1=${user?._id}&user2=${patientData.patientId}`)}
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      Message
-                    </Button>
+                    {user?._id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => navigate(`/doctor/messages?user1=${user._id}&user2=${patientData.patientId}`)}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Message
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

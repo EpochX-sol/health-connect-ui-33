@@ -190,8 +190,14 @@ export const api = {
       headers,
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create appointment');
+    
     const result = await response.json();
+    
+    if (!response.ok) {
+      console.error('Appointment creation error response:', result);
+      throw new Error(result.message || result.error || 'Failed to create appointment');
+    }
+    
     console.log('createAppointment:', result);
     return result;
   },
@@ -417,8 +423,14 @@ export const api = {
       headers,
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create prescription');
+    
     const result = await response.json();
+    
+    if (!response.ok) {
+      console.error('Prescription creation error response:', result);
+      throw new Error(result.message || result.error || 'Failed to create prescription');
+    }
+    
     console.log('createPrescription:', result);
     return result;
   },
@@ -442,10 +454,27 @@ export const api = {
     if (patientId) url += `/patient/${patientId}`;
     
     const response = await fetch(url, { headers });
-    if (!response.ok) throw new Error('Failed to fetch prescriptions');
+    if (!response.ok) {
+      console.error('getAllPrescriptions error:', response.status, response.statusText);
+      throw new Error(`Failed to fetch prescriptions: ${response.status}`);
+    }
     const result = await response.json();
     console.log('getAllPrescriptions:', result);
     return result;
+  },
+
+  getPrescriptionsByDoctor: async (doctorId: string, token?: string) => {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_BASE_URL}/prescriptions/doctor/${doctorId}`, { headers });
+    if (!response.ok) {
+      console.error('getPrescriptionsByDoctor error:', response.status, response.statusText);
+      throw new Error(`Failed to fetch prescriptions: ${response.status}`);
+    }
+    const result = await response.json();
+    console.log('getPrescriptionsByDoctor:', result);
+    return Array.isArray(result) ? result : result.prescriptions || [];
   },
 
   updatePrescription: async (id: string, data: any, token?: string) => {

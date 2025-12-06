@@ -540,16 +540,16 @@ const AppointmentDetail = () => {
                 </Button>
               )}
 
-              {appointment.status !== 'cancelled' && (
+              {appointment.status !== 'cancelled' && user?._id && (
                 <Button
                   variant="outline"
                   className="w-full gap-2"
                   onClick={() => {
                     const otherUserId = user?.role === 'patient' ? appointment.doctor_id : appointment.patient_id;
                     if (user?.role === 'doctor') {
-                      navigate(`/doctor/messages?user1=${user?._id}&user2=${otherUserId}`);
+                      navigate(`/doctor/messages?user1=${user._id}&user2=${otherUserId}`);
                     } else {
-                      navigate(`/patient/messages?user1=${user?._id}&user2=${otherUserId}`);
+                      navigate(`/patient/messages?user1=${user._id}&user2=${otherUserId}`);
                     }
                   }}
                 >

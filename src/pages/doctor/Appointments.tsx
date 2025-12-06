@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Clock, Eye, Search, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Eye, Search, AlertCircle, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Appointment } from '@/types';
@@ -29,14 +29,18 @@ const DoctorAppointments = () => {
   }, [user, token]);
 
   const fetchAppointments = async () => {
-    if (!token || !user) return;
+    if (!token || !user || !user._id) {
+      setLoading(false);
+      return;
+    }
     
     try {
       const data = await api.getAppointmentsForDoctor(user._id, token);
-      setAppointments(data);
+      setAppointments(Array.isArray(data) ? data : []);
 
       // Fetch patient names
-      const patientIds = [...new Set(data.map((apt: Appointment) => apt.patient_id).filter(Boolean))] as string[];
+      const appointmentArray = Array.isArray(data) ? data : [];
+      const patientIds = [...new Set(appointmentArray.map((apt: Appointment) => apt.patient_id).filter(Boolean))] as string[];
       const names: Record<string, string> = {};
       await Promise.all(patientIds.map(async (id: string) => {
         try {
@@ -48,10 +52,12 @@ const DoctorAppointments = () => {
       }));
       setPatientNames(names);
     } catch (error) {
+      console.error('Error fetching appointments:', error);
       toast({
         title: 'Failed to load appointments',
         variant: 'destructive',
       });
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -163,14 +169,16 @@ const DoctorAppointments = () => {
                         View Details
                       </Button>
 
-                      <Button
-                        onClick={() => navigate(`/doctor/messages?user1=${user?._id}&user2=${appointment.patient_id}`)}
-                        variant="outline"
-                        className="gap-2 md:w-auto w-full"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        Message
-                      </Button>
+                      {user?._id && (
+                        <Button
+                          onClick={() => navigate(`/doctor/messages?user1=${user._id}&user2=${appointment.patient_id}`)}
+                          variant="outline"
+                          className="gap-2 md:w-auto w-full"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          Message
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

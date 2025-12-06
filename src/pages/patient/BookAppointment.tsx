@@ -170,15 +170,26 @@ const BookAppointment = () => {
 
       const hours_duration = calculateDuration();
 
-      // Create appointment with hours field
+      console.log('Creating appointment with data:', {
+        patient_id: user?._id,
+        doctor_id: selectedDoctor!.user_id,
+        scheduled_time: scheduledTime.toISOString(),
+      });
+
+      // Create appointment
       const response = await api.createAppointment({
         patient_id: user?._id!,
         doctor_id: selectedDoctor!.user_id,
         scheduled_time: scheduledTime.toISOString(),
-        hours: hours_duration,
-      } as any);
+      });
+
+      console.log('Appointment created:', response);
 
       const appointment = response.appointment || response;
+
+      if (!appointment || !appointment._id) {
+        throw new Error('No appointment ID returned from server');
+      }
 
       // Calculate cost for Chapa
       const totalAmount = hours_duration * (selectedDoctor!.pricePerHour || 0);

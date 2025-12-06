@@ -45,31 +45,46 @@ const DoctorPrescriptions = () => {
       // Fetch prescriptions created by this doctor
       let prescData = [];
       try {
-        prescData = await api.getAllPrescriptions(token);
-        // Filter to only prescriptions created by this doctor
-        prescData = prescData.filter((p: Prescription) => p.doctor_id === user._id);
+        prescData = await api.getPrescriptionsByDoctor(user._id, token);
+        console.log('Prescriptions fetched for doctor:', prescData);
       } catch (error) {
-        console.error('Failed to fetch prescriptions:', error);
+        console.error('Failed to fetch prescriptions by doctor:', error);
+        prescData = [];
       }
 
       // Fetch doctor's appointments
       let aptData = [];
       try {
-        aptData = await api.getAppointmentsForDoctor(user._id, token);
+        const result = await api.getAppointmentsForDoctor(user._id, token);
+        // Handle both array response and object response
+        aptData = Array.isArray(result) ? result : (result.appointments || []);
+        console.log('Appointments fetched for doctor:', aptData);
       } catch (error) {
         console.error('getAppointmentsForDoctor failed, trying getAllAppointments:', error);
-        const allApts = await api.getAppointments(token);
+        const result = await api.getAppointments(token);
+        const allApts = Array.isArray(result) ? result : (result.appointments || []);
         aptData = allApts.filter((a: Appointment) => a.doctor_id === user._id);
+        console.log('Appointments filtered from getAllAppointments:', aptData);
       }
 
+      // Filter non-cancelled appointments
+      const completedAppointments = aptData.filter((a: Appointment) => a.status !== 'cancelled');
+      console.log('All appointments fetched:', aptData);
+      console.log('Filtered appointments (not cancelled):', completedAppointments);
+      console.log('Prescriptions to display:', prescData);
+      
       setPrescriptions(prescData);
-      setAppointments(aptData.filter((a: Appointment) => a.status === 'completed'));
+      setAppointments(completedAppointments);
 
-      // Fetch patient names for all prescriptions
-      const patientIds = [...new Set(prescData.map((p: Prescription) => p.patient_id))];
-      if (patientIds.length > 0) {
+      // Collect all patient IDs from both prescriptions and appointments
+      const prescPatientIds = prescData.map((p: Prescription) => p.patient_id);
+      const aptPatientIds = completedAppointments.map((a: Appointment) => a.patient_id);
+      const allPatientIds = [...new Set([...prescPatientIds, ...aptPatientIds])].filter(Boolean);
+
+      // Fetch patient names for all patients
+      if (allPatientIds.length > 0) {
         const names: Record<string, string> = {};
-        await Promise.all(patientIds.map(async (patientId: string) => {
+        await Promise.all(allPatientIds.map(async (patientId: string) => {
           try {
             const patientData = await api.getUser(patientId, token);
             names[patientId] = patientData.name;
@@ -183,12 +198,14 @@ const DoctorPrescriptions = () => {
     }, 300);
   };
 
-  const filteredPrescriptions = prescriptions.filter((rx) =>
-    rx.medications.some((med) =>
-      med.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ) ||
-    patientNames[rx.patient_id]?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPrescriptions = prescriptions
+    .filter((rx) =>
+      rx.medications.some((med) =>
+        med.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ) ||
+      patientNames[rx.patient_id]?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   if (loading) {
     return (
@@ -359,7 +376,7 @@ const DoctorPrescriptions = () => {
                   {searchQuery ? 'No prescriptions found' : 'No prescriptions yet'}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {searchQuery ? 'Try adjusting your search' : 'Create prescriptions for your completed appointments'}
+                  {searchQuery ? 'Try adjusting your search' : 'Click "New Prescription" to create prescriptions for your appointments'}
                 </p>
               </CardContent>
             </Card>
