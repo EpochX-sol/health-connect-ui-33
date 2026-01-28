@@ -108,7 +108,7 @@ const RegisterDoctor = () => {
               <Activity className="w-6 h-6 text-primary-foreground" />
             </div>
             <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent text-white">
-              MedLink
+              Online Doctor
             </span>
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Doctor Registration</h1>

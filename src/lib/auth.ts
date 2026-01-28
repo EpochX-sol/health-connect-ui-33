@@ -1,6 +1,6 @@
 import { User } from '@/types';
 
-const AUTH_STORAGE_KEY = 'MedLink_auth';
+const AUTH_STORAGE_KEY = 'Online Doctor_auth';
 
 export interface AuthData {
   user: User;
