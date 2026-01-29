@@ -326,7 +326,7 @@ export const api = {
     const headers: any = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
     
-    const response = await fetch(`${API_BASE_URL}/appointments/${id}/complete`, {
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({ status: 'completed' }),
