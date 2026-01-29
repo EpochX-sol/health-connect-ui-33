@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
@@ -46,6 +47,10 @@ const AppointmentDetail = () => {
   const [notes, setNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (id && token && user) {
@@ -114,35 +119,41 @@ const AppointmentDetail = () => {
 
   const handleCancelAppointment = async () => {
     if (!appointment) return;
-    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+    setConfirmCancelOpen(true);
+  };
 
+  const confirmCancelAppointment = async () => {
+    if (!appointment) return;
+    setCancelling(true);
     try {
       await api.cancelAppointment(appointment._id, token!);
-      toast({
-        title: 'Appointment cancelled',
-      });
+      toast({ title: 'Appointment cancelled' });
       navigate(user?.role === 'patient' ? '/patient/appointments' : '/doctor/appointments');
     } catch (error) {
-      toast({
-        title: 'Failed to cancel appointment',
-        variant: 'destructive',
-      });
+      toast({ title: 'Failed to cancel appointment', variant: 'destructive' });
+    } finally {
+      setCancelling(false);
+      setConfirmCancelOpen(false);
     }
   };
 
   const handleMarkCompleted = async () => {
     if (!appointment) return;
+    setConfirmCompleteOpen(true);
+  };
+
+  const confirmMarkCompleted = async () => {
+    if (!appointment) return;
+    setCompleting(true);
     try {
       await api.completeAppointment(appointment._id, token!);
-      toast({
-        title: 'Appointment marked as completed',
-      });
+      toast({ title: 'Appointment marked as completed' });
       setAppointment({ ...appointment, status: 'completed' });
+      setConfirmCompleteOpen(false);
     } catch (error) {
-      toast({
-        title: 'Failed to complete appointment',
-        variant: 'destructive',
-      });
+      toast({ title: 'Failed to complete appointment', variant: 'destructive' });
+    } finally {
+      setCompleting(false);
     }
   };
 
@@ -534,7 +545,7 @@ const AppointmentDetail = () => {
                 </>
               )}
 
-              {user?.role === 'doctor' && appointment.status === 'in-progress' && (
+              {user?.role === 'doctor' && appointment.status !== 'completed' && appointment.status !== 'cancelled' && (
                 <Button className="w-full" onClick={handleMarkCompleted}>
                   Mark as Completed
                 </Button>
@@ -559,6 +570,50 @@ const AppointmentDetail = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Confirm Complete Dialog */}
+          <Dialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Mark appointment as completed</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to mark this appointment as completed? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <div className="flex gap-2 w-full">
+                  <Button variant="outline" className="w-full" onClick={() => setConfirmCompleteOpen(false)} disabled={completing}>
+                    Cancel
+                  </Button>
+                  <Button className="w-full" onClick={confirmMarkCompleted} disabled={completing}>
+                    {completing ? 'Completing...' : 'Confirm'}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Confirm Cancel Dialog */}
+          <Dialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Cancel appointment</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to cancel this appointment? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <div className="flex gap-2 w-full">
+                  <Button variant="outline" className="w-full" onClick={() => setConfirmCancelOpen(false)} disabled={cancelling}>
+                    Back
+                  </Button>
+                  <Button className="w-full" onClick={confirmCancelAppointment} disabled={cancelling}>
+                    {cancelling ? 'Cancelling...' : 'Confirm Cancel'}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Status Timeline */}
           <Card>

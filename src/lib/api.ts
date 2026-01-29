@@ -1,5 +1,6 @@
 const API_BASE_URL = `${import.meta.env.VITE_BACKEND_URL}/api` || 'https://proj-babi.onrender.com/api';
 
+
 export const api = {
     getMessagesByUser: async (userId: string, token?: string) => {
       const headers: any = { 'Content-Type': 'application/json' };
@@ -140,11 +141,43 @@ export const api = {
     const headers: any = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
     
+    // Try fetching doctor profile by provided id first
     const response = await fetch(`${API_BASE_URL}/doctors/${id}`, { headers });
-    if (!response.ok) throw new Error('Failed to fetch doctor profile');
-    const result = await response.json();
-    console.log('getDoctorProfile:', result);
-    return result;
+    if (response.ok) {
+      const result = await response.json();
+      console.log('getDoctorProfile (by id):', result);
+      return result;
+    }
+
+    // If not found (404) it's possible the caller passed a user id instead of a doctor profile id.
+    // Fall back to listing all doctors and find the profile whose `user_id` matches the provided id.
+    if (response.status === 404) {
+      try {
+        const allDoctors = await (async () => {
+          const headers2: any = { 'Content-Type': 'application/json' };
+          if (token) headers2.Authorization = `Bearer ${token}`;
+          const resp = await fetch(`${API_BASE_URL}/doctors`, { headers: headers2 });
+          if (!resp.ok) throw new Error('Failed to fetch doctors for fallback');
+          return await resp.json();
+        })();
+
+        const matched = allDoctors.find((doc: any) => {
+          const userId = typeof doc.user_id === 'string' ? doc.user_id : (doc.user_id as any)?._id;
+          return userId === id;
+        });
+
+        if (matched) {
+          console.log('getDoctorProfile (by user_id fallback):', matched);
+          return matched;
+        }
+      } catch (err) {
+        console.warn('getDoctorProfile fallback failed:', err);
+      }
+    }
+
+    // If we reach here, surface the original error
+    const errText = await response.text().catch(() => 'Failed to fetch doctor profile');
+    throw new Error(errText || 'Failed to fetch doctor profile');
   },
 
   updateDoctorProfile: async (id: string, data: any, token?: string) => {
@@ -553,7 +586,14 @@ export const api = {
     if (token) headers.Authorization = `Bearer ${token}`;
     
     const response = await fetch(`${API_BASE_URL}/payments`, { headers });
-    if (!response.ok) throw new Error('Failed to fetch payments');
+    if (!response.ok) {
+      // If backend doesn't expose payments yet, return empty array instead of throwing
+      if (response.status === 404) {
+        console.warn('getPayments: payments endpoint not found (404). Returning empty array.');
+        return [];
+      }
+      throw new Error('Failed to fetch payments');
+    }
     const result = await response.json();
     console.log('getPayments:', result);
     return result;

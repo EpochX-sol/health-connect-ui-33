@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { User, Mail, Phone, MapPin, Calendar, Shield, Save, Edit2, Activity } from 'lucide-react';
@@ -30,6 +31,8 @@ const PatientProfile = () => {
     name: user?.name || '',
     email: user?.email || '',
   });
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user?._id && token) {
@@ -123,23 +126,20 @@ const PatientProfile = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      return;
-    }
+    setConfirmDeleteOpen(true);
+  };
 
+  const confirmDeleteAccount = async () => {
+    setDeleting(true);
     try {
       await api.deleteUser(user!._id, token);
-      toast({
-        title: 'Account deleted',
-        description: 'Your account has been permanently deleted.',
-      });
-      // Redirect to login or home
+      toast({ title: 'Account deleted', description: 'Your account has been permanently deleted.' });
       window.location.href = '/login';
     } catch (error) {
-      toast({
-        title: 'Failed to delete account',
-        variant: 'destructive',
-      });
+      toast({ title: 'Failed to delete account', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
     }
   };
 
@@ -461,6 +461,24 @@ const PatientProfile = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Account</DialogTitle>
+            <DialogDescription>Are you sure you want to delete your account? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <div className="flex gap-2 w-full">
+              <Button variant="outline" className="w-full" onClick={() => setConfirmDeleteOpen(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button className="w-full" onClick={confirmDeleteAccount} disabled={deleting}>
+                {deleting ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
