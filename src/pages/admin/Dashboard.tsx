@@ -209,23 +209,51 @@ const AdminDashboard = () => {
     }));
   };
 
-  // Generate revenue by month from payments
+  // Generate revenue by month from appointments (preferred) or payments
   const generateRevenueByMonth = () => {
     const revenueByMonth: Record<string, number> = {};
     
-    payments.forEach((payment) => {
-      // Only count paid payments with amount > 0
-      if (payment.status === 'paid' && payment.amount > 0) {
-        const date = new Date(payment.createdAt);
-        const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-        revenueByMonth[month] = (revenueByMonth[month] || 0) + payment.amount;
-      }
-    });
+    // Try to calculate from appointments first (more reliable)
+    if (appointments && appointments.length > 0) {
+      appointments.forEach((apt) => {
+        // Count only completed appointments with amount > 0
+        if (apt.status === 'completed' && apt.totalAmount > 0) {
+          try {
+            const date = new Date(apt.scheduled_time);
+            const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+            revenueByMonth[month] = (revenueByMonth[month] || 0) + apt.totalAmount;
+          } catch {
+            // Skip if date parsing fails
+          }
+        }
+      });
+    }
+
+    // Fall back to payments if no revenue from appointments
+    if (Object.keys(revenueByMonth).length === 0 && payments && payments.length > 0) {
+      payments.forEach((payment) => {
+        if (payment.status === 'paid' && payment.amount > 0) {
+          try {
+            const date = new Date(payment.createdAt);
+            const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+            revenueByMonth[month] = (revenueByMonth[month] || 0) + payment.amount;
+          } catch {
+            // Skip if date parsing fails
+          }
+        }
+      });
+    }
 
     // Sort by month and return as array
     return Object.entries(revenueByMonth)
       .map(([month, revenue]) => ({ month, revenue }))
-      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+      .sort((a, b) => {
+        try {
+          return new Date(a.month).getTime() - new Date(b.month).getTime();
+        } catch {
+          return 0;
+        }
+      });
   };
 
   // Calculate total revenue
