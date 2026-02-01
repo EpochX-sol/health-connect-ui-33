@@ -307,7 +307,7 @@ const PatientDashboard = () => {
                 </div>
                 <p className="text-muted-foreground mb-4 font-medium">No upcoming appointments</p>
                 <Button asChild className="gap-2">
-                  <Link to="/patient/appointments/book">
+                  <Link to="/patient/book-appointment">
                     <Plus className="w-4 h-4" />
                     Book Your First Appointment
                   </Link>
