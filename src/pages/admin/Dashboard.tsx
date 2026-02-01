@@ -230,12 +230,21 @@ const AdminDashboard = () => {
 
   // Calculate total revenue
   const calculateTotalRevenue = () => {
-    return payments.reduce((total, payment) => {
-      if (payment.status === 'paid' && payment.amount > 0) {
-        return total + payment.amount;
-      }
-      return total;
-    }, 0);
+    // Prefer calculating from payments when available, otherwise fall back to server stats
+    if (payments && payments.length > 0) {
+      return payments.reduce((total, payment) => {
+        if (payment.status === 'paid' && payment.amount > 0) {
+          return total + payment.amount;
+        }
+        return total;
+      }, 0);
+    }
+
+    if (stats && typeof stats.totalRevenue === 'number') {
+      return stats.totalRevenue;
+    }
+
+    return 0;
   };
 
   // Fallback function to get user by ID from the user list
